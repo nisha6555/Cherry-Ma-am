@@ -345,3 +345,159 @@ export function cleanTopicHeader(rawText: string, fallbackSubject?: string, fall
   return clean || (fallbackIndex !== undefined ? `Topic Part ${fallbackIndex + 1}` : "Topic");
 }
 
+/**
+ * Categorizes a section header into the required teaching phase rank (1 to 5)
+ * 1: 'intro' (Title, SVG Schematics, Prediction Polls)
+ * 2: 'concept' (Source Content, Definitions, Analogies, Core Formulas, KaTeX Equations)
+ * 3: 'example' (Worked Numerical Examples, Deep Dives, Step-by-Step Derivations)
+ * 4: 'doubt' (Common Exam Traps, Silly Mistakes, Mnemonics, Reverse Checkpoints / MVQs, Hints)
+ * 5: 'transition' / 'complete' (Quick Flashcard Challenges, Retrieval Practice, Summaries)
+ */
+export function getSectionPhaseRank(headerLine: string): number {
+  const lower = headerLine.toLowerCase();
+  if (
+    lower.includes("poll") ||
+    lower.includes("prediction") ||
+    lower.includes("❓") ||
+    lower.includes("sawaal") ||
+    lower.includes("question") ||
+    lower.includes("option")
+  ) {
+    return 1; // Unlocks in Phase 1 ('intro')
+  }
+  if (
+    lower.includes("decode") ||
+    lower.includes("💡") ||
+    lower.includes("analogy") ||
+    lower.includes("formula") ||
+    lower.includes("📐") ||
+    lower.includes("equation") ||
+    lower.includes("definition") ||
+    lower.includes("source") ||
+    lower.includes("📖") ||
+    lower.includes("concept") ||
+    lower.includes("key point")
+  ) {
+    return 2; // Unlocks in Phase 2 ('concept')
+  }
+  if (
+    lower.includes("worked example") ||
+    lower.includes("deep dive") ||
+    lower.includes("🔬") ||
+    lower.includes("numerical") ||
+    lower.includes("calculation") ||
+    lower.includes("step 1") ||
+    lower.includes("step-by-step") ||
+    lower.includes("solution") ||
+    lower.includes("soln")
+  ) {
+    return 3; // Unlocks in Phase 3 ('example')
+  }
+  if (
+    lower.includes("pitfall") ||
+    lower.includes("trap") ||
+    lower.includes("⚠️") ||
+    lower.includes("mistake") ||
+    lower.includes("mnemonic") ||
+    lower.includes("jugad") ||
+    lower.includes("jugaad") ||
+    lower.includes("🧠") ||
+    lower.includes("topper") ||
+    lower.includes("🎯") ||
+    lower.includes("checkpoint") ||
+    lower.includes("reverse") ||
+    lower.includes("hint")
+  ) {
+    return 4; // Unlocks in Phase 4 ('doubt')
+  }
+  if (
+    lower.includes("flashcard") ||
+    lower.includes("challenge") ||
+    lower.includes("⚡") ||
+    lower.includes("transition") ||
+    lower.includes("recap") ||
+    lower.includes("summary")
+  ) {
+    return 5; // Unlocks in Phase 5 ('transition')
+  }
+  return 1;
+}
+
+/**
+ * Phase-Synchronized Blackboard Visibility Filter.
+ * Ensures the student ONLY sees content and diagrams corresponding to what Cherry Ma'am
+ * has reached in her active teaching lifecycle. Future phase sections (formulas, numericals,
+ * exam traps, reverse checkpoints) remain strictly withheld until Cherry explicitly transitions
+ * into those teaching phases.
+ */
+export function filterBoardContentByPhase(
+  rawMarkdown: string,
+  teachingPhase?: string,
+  isCurrent: boolean = true
+): string {
+  if (!rawMarkdown || !rawMarkdown.trim()) return "";
+
+  // Historical past topics or completed sessions display full archive notes
+  if (!isCurrent) return rawMarkdown;
+
+  const p = (teachingPhase || "intro").toLowerCase();
+  let currentPhaseRank = 1;
+  if (p === "intro") currentPhaseRank = 1;
+  else if (p === "concept") currentPhaseRank = 2;
+  else if (p === "example") currentPhaseRank = 3;
+  else if (p === "doubt") currentPhaseRank = 4;
+  else if (p === "transition" || p === "graduation" || p === "completed" || p === "idle" || p === "complete") {
+    currentPhaseRank = 5;
+  }
+
+  // If in transition, graduation or complete phase, all content is fully unlocked
+  if (currentPhaseRank >= 5) return rawMarkdown;
+
+  const lines = rawMarkdown.split("\n");
+  const visibleSections: string[] = [];
+  let currentSectionHeader = "";
+  let currentSectionBody: string[] = [];
+  let isIntroHeader = true;
+
+  const isSubSectionHeader = (line: string) => {
+    const t = line.trim();
+    if (t.startsWith("# ")) return false; // # Main Topic Title is always part of Intro
+    if (t.startsWith("## ") || t.startsWith("### ")) return true;
+    if (/^(📌|💡|🎯|📐|🧠|⚠️|🔬|🎒|🔍|❓|🚀|🎓|📖|⚡)/.test(t)) return true;
+    return false;
+  };
+
+  const flushSection = () => {
+    if (isIntroHeader) {
+      // Intro header (Main Title + initial Hero SVG diagram / intro notes) is always displayed
+      if (currentSectionBody.length > 0) {
+        visibleSections.push(currentSectionBody.join("\n"));
+      }
+      isIntroHeader = false;
+    } else if (currentSectionHeader) {
+      const requiredRank = getSectionPhaseRank(currentSectionHeader);
+      if (requiredRank <= currentPhaseRank) {
+        visibleSections.push(currentSectionBody.join("\n"));
+      }
+    } else if (currentSectionBody.length > 0) {
+      visibleSections.push(currentSectionBody.join("\n"));
+    }
+    currentSectionBody = [];
+    currentSectionHeader = "";
+  };
+
+  for (const line of lines) {
+    if (isSubSectionHeader(line)) {
+      flushSection();
+      currentSectionHeader = line;
+      currentSectionBody = [line];
+    } else {
+      currentSectionBody.push(line);
+    }
+  }
+  flushSection();
+
+  const filtered = visibleSections.join("\n\n").trim();
+  return filtered || rawMarkdown;
+}
+

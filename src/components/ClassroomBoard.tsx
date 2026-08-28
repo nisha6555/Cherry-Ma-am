@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { MathRenderer } from "./MathRenderer";
 import { ChalkTypewriter } from "./ChalkTypewriter";
 import { Trash2, GraduationCap, RefreshCw, BookOpen, Sparkles, HelpCircle, Send, Printer, ChevronDown, Power, MicOff, Maximize2, Minimize2 } from "lucide-react";
-import { extractBoardContent, sanitizeRawBoardData, cleanTopicHeader } from "../utils/boardFilter";
+import { extractBoardContent, sanitizeRawBoardData, cleanTopicHeader, filterBoardContentByPhase } from "../utils/boardFilter";
 import { triggerCelebrationConfetti } from "../utils/confetti";
 
 interface ClassroomBoardProps {
@@ -141,11 +141,16 @@ const ChalkboardTopicBlockComponent: React.FC<ChalkboardTopicBlockProps> = ({
           const currentPhase = (teachingPhase || "intro").toLowerCase();
           const isIntro = currentPhase === "intro";
           const isOpenBoardTopic = cleanHeader.includes("Live 1-on-1") || cleanHeader.includes("Open Blackboard") || (lessonTitle && lessonTitle.includes("Open Blackboard"));
-          const effectiveBlockContent = blockContent || (isCurrent && isIntro 
+          const rawBlockContent = blockContent || (isCurrent && isIntro 
             ? (isOpenBoardTopic 
                 ? `# 🎙️ Live 1-on-1 Study with Cherry Ma'am\n\n### 💡 Aapka Personal Doubt & Concept Blackboard\n- 🎤 **Direct Voice Mode Active**: Jo bhi topic, formula ya sawaal seekhna hai, seedhe mic se boliye!\n- ✍️ **Instant Chalkboard Notes**: Cherry Ma'am aapke bolte hi board par step-by-step likhkar samjhayengi.\n- 🎯 **Ask Anything**: Any concept, derivation, NCERT question, ya exam doubt!`
                 : `${cleanHeader.startsWith("#") ? cleanHeader : "# " + cleanHeader}\n\n### ❓ PREDICTION POLL: Option A vs Option B\nListen to Cherry Ma'am's real-world mystery hook and predict the correct option!`)
             : "");
+
+          // Filter content so future phase sections only appear as Cherry Ma'am progresses
+          const effectiveBlockContent = isCurrent 
+            ? filterBoardContentByPhase(rawBlockContent, teachingPhase, isCurrent)
+            : rawBlockContent;
 
           return effectiveBlockContent ? (
             <ChalkTypewriter
@@ -153,9 +158,10 @@ const ChalkboardTopicBlockComponent: React.FC<ChalkboardTopicBlockProps> = ({
               state={isCurrent ? state : "idle"}
               cherryVolume={isCurrent ? cherryVolume : 0}
               latestSpeech={isCurrent ? latestSpeech : ""}
-              isAcademicNotes={!isCurrent || !!(customBoardContent && customBoardContent.trim() !== "")}
+              isAcademicNotes={!isCurrent || state === "disconnected"}
               isFallback={false}
               isPaused={isCurrent ? isPaused : false}
+              teachingPhase={isCurrent ? teachingPhase : "completed"}
             />
           ) : isCurrent ? (
             <div className="py-6 px-4 rounded-xl bg-black/30 border border-emerald-500/15 text-center space-y-2 animate-pulse">
@@ -1388,12 +1394,13 @@ export const ClassroomBoard: React.FC<ClassroomBoardProps> = ({
               {/* Slate text details and calculations */}
               <div className="chalk-font px-2 md:px-4 leading-loose tracking-wide text-zinc-100 select-text w-full">
                 <ChalkTypewriter 
-                  text={activeBoardContent} 
+                  text={filterBoardContentByPhase(activeBoardContent, teachingPhase, true)} 
                   state={state} 
                   cherryVolume={cherryVolume} 
                   latestSpeech={latestSpeech} 
-                  isAcademicNotes={!!(customBoardContent && customBoardContent.trim() !== "")}
+                  isAcademicNotes={state === "disconnected"}
                   isPaused={isPaused}
+                  teachingPhase={teachingPhase || "intro"}
                 />
               </div>
             </div>

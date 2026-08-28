@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { 
   Sparkles, Send, Bot, User, Brain, Heart, Target, Lightbulb, 
   Calendar, Award, BookOpen, Smile, Zap, MessageSquare, Volume2, 
-  VolumeX, RefreshCw, CheckCircle, ArrowRight, ShieldCheck, HelpCircle,
+  VolumeX, RefreshCw, CheckCircle, ArrowRight, ArrowLeft, ShieldCheck, HelpCircle,
   Clock, Flame, Copy, Check, Compass, Radio, Activity, Star, CheckCheck,
   Maximize2, Minimize2, X
 } from "lucide-react";
@@ -29,6 +29,8 @@ interface KiaraCounselorProps {
   analytics?: PerformanceAnalytics;
   onNavigateToClassroom?: () => void;
   onStartVoiceCall?: () => void;
+  onClose?: () => void;
+  defaultFullScreen?: boolean;
 }
 
 interface ChatMessage {
@@ -48,6 +50,8 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
   analytics,
   onNavigateToClassroom,
   onStartVoiceCall,
+  onClose,
+  defaultFullScreen = false,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
@@ -55,7 +59,7 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeQuickTab, setActiveQuickTab] = useState<"chat" | "routine" | "mnemonics" | "mindset">("chat");
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(defaultFullScreen);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -297,8 +301,22 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
         isFullScreen ? "pt-[max(10px,env(safe-area-inset-top))]" : ""
       }`}>
         
-        {/* Left Contact Info */}
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Left Contact Info & Optional Back/Close Button */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isFullScreen) setIsFullScreen(false);
+                onClose();
+              }}
+              className="p-1.5 -ml-1 hover:bg-white/20 active:bg-white/30 rounded-full text-white transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-2xs"
+              title="Back to Profile / Exit Kiara"
+            >
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
+            </button>
+          )}
+
           <div className="relative shrink-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 flex items-center justify-center text-xl shadow-inner border-2 border-white/40">
               👩‍🎓
@@ -363,6 +381,21 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
           >
             {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+
+          {/* Close / Exit Button */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isFullScreen) setIsFullScreen(false);
+                onClose();
+              }}
+              className="p-1.5 hover:bg-red-500/80 active:bg-red-600 rounded-full text-white bg-white/15 transition-all cursor-pointer flex items-center justify-center border border-white/25 shadow-xs"
+              title="Close / Exit Kiara"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
+            </button>
+          )}
         </div>
       </div>
 

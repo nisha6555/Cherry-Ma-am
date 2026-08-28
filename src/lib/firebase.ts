@@ -1,17 +1,10 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { 
-  initializeFirestore,
-  getFirestore, 
-  doc, 
-  getDocFromServer
-} from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -62,24 +55,3 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Connection Validation
-async function testConnection() {
-  try {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return;
-    }
-    // Race with a 3s timeout to avoid 10s blocking warnings during cold boots
-    const testPromise = getDocFromServer(doc(db, 'test', 'connection'));
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Connection check timed out, operating offline')), 3000)
-    );
-    await Promise.race([testPromise, timeoutPromise]);
-  } catch (error) {
-    if (error instanceof Error) {
-      console.warn("[Firestore] Operating in offline/local cache mode until connection is active.");
-    }
-  }
-}
-testConnection().catch(() => {
-  // Silent fallback to local cache
-});

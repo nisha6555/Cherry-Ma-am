@@ -355,3 +355,24 @@
 
 
 
+
+/* ==========================================================================
+   Mobile Horizontal Swipe & Touch Momentum Utilities (Phase 4 Polish)
+   ========================================================================== */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.touch-pan-x {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}

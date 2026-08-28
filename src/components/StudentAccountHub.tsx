@@ -7,8 +7,9 @@ import {
   Play, Pause, Heart, Volume2, VolumeX, MessageSquare, Copy, Check,
   Zap, Film, Smartphone, Send, Flame, ThumbsUp, Video as VideoIcon,
   Camera, Image as ImageIcon, Eye, ZoomIn, Layers, Shuffle, Lightbulb,
-  Printer, CheckCircle2
-} from "lucide-react";
+  Printer, CheckCircle2, SlidersHorizontal, ArrowUpDown, Grid, List, Star,
+  ListTodo, CheckSquare, Square, Target, TrendingUp, Radio, Gauge, Activity, CheckCircle, Crosshair, Hourglass, BarChart2, PieChart, Filter, ArrowLeft, ArrowRight, AlertTriangle
+, RotateCw } from "lucide-react";
 import katex from "katex";
 import { db, auth } from "../lib/firebase"; // Import database configuration
 import { 
@@ -28,6 +29,7 @@ import { sanitizeSvg } from "../utils/sanitizeSvg";
 import { parseAndRenderDiagramTag } from "../utils/parametricPrimitives";
 import { KiaraCounselor } from "./KiaraCounselor";
 import { KiaraLiveVoiceModal } from "./KiaraLiveVoiceModal";
+import { MathRenderer } from "./MathRenderer";
 import { safeSetItem } from "../utils/safeStorage";
 import { 
   getUnifiedRevisionPayload, 
@@ -35,6 +37,11 @@ import {
   saveActiveLearningContext 
 } from "../utils/activeLearningStore";
 import { ConceptInfographicPoster } from "./ConceptInfographicPoster";
+import { CurriculumBlindspotTracker } from "./CurriculumBlindspotTracker";
+import { PrerequisiteGapFinder } from "./PrerequisiteGapFinder";
+import { ExamSpeedSprintSimulator } from "./ExamSpeedSprintSimulator";
+import { GitFork } from "lucide-react";
+import { Compass } from "lucide-react";
 import { ConceptInfographicData } from "../types";
 
 const DIMENSION_DETAILS = [
@@ -544,6 +551,20 @@ const renderTextWithKaTeX = (text: string, search?: string): React.ReactNode[] =
   });
 };
 
+// KaTeX HTML rendering memoization cache for ultra-smooth UI transitions
+const katexRenderCache: Record<string, string> = {};
+const renderKaTeXHtmlSafe = (formulaStr?: string): string => {
+  if (!formulaStr) return "";
+  if (katexRenderCache[formulaStr]) return katexRenderCache[formulaStr];
+  try {
+    const rendered = katex.renderToString(formulaStr, { displayMode: false, throwOnError: false });
+    katexRenderCache[formulaStr] = rendered;
+    return rendered;
+  } catch {
+    return formulaStr;
+  }
+};
+
 export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
   onClose,
   studentName,
@@ -570,12 +591,308 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
   const [quizAttempts, setQuizAttempts] = useState<any[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [isKiaraVoiceModalOpen, setIsKiaraVoiceModalOpen] = useState<boolean>(false);
+  const [isKiaraFullScreenOpen, setIsKiaraFullScreenOpen] = useState<boolean>(false);
+  
+  // Phase 1: Micro-Diagnostics & Mistake Matrix States
+  const [performanceWorkspaceTab, setPerformanceWorkspaceTab] = useState<"macro" | "micro" | "retention" | "agility" | "curriculum" | "prerequisites" | "sprint">("macro");
+  
+  // Phase 3: Cognitive Agility, Speed-Accuracy Matrix & Exam Stamina States
+  const [staminaQuadrantFilter, setStaminaQuadrantFilter] = useState<"all" | "flow" | "overthink" | "rushing" | "roadblock">("all");
+  const [staminaActiveSubject, setStaminaActiveSubject] = useState<string>("all");
+  const [selectedAgilityDrillTopic, setSelectedAgilityDrillTopic] = useState<any | null>(null);
+  const [activeSprintSeconds, setActiveSprintSeconds] = useState<number>(60);
+  const [isSprintRunning, setIsSprintRunning] = useState<boolean>(false);
+  const [sprintStepIndex, setSprintStepIndex] = useState<number>(0);
+  const [sprintScore, setSprintScore] = useState<number>(0);
+  
+  // Phase 2: Spaced Repetition & Retention States
+  const [retentionFilterUrgency, setRetentionFilterUrgency] = useState<"all" | "critical" | "warning" | "stable">("all");
+  const [retentionActiveSubject, setRetentionActiveSubject] = useState<string>("all");
+  const [retentionViewMode, setRetentionViewMode] = useState<"carousel" | "list">("carousel");
+  const [staminaViewMode, setStaminaViewMode] = useState<"carousel" | "list">("carousel");
+  const [selectedRetentionFlashcard, setSelectedRetentionFlashcard] = useState<any | null>(null);
+  const [activeFlashcardFlipped, setActiveFlashcardFlipped] = useState<boolean>(false);
+  const [microSubjectFilter, setMicroSubjectFilter] = useState<string>("all");
+  const [microMasteryFilter, setMicroMasteryFilter] = useState<"all" | "critical" | "practicing" | "mastered">("all");
+  const [microMistakeFilter, setMicroMistakeFilter] = useState<"all" | "conceptual" | "calculation" | "formula" | "speed">("all");
+  const [microSearchQuery, setMicroSearchQuery] = useState<string>("");
+  const [microViewMode, setMicroViewMode] = useState<"carousel" | "list">("carousel");
+  const [selectedDrillSubtopic, setSelectedDrillSubtopic] = useState<any | null>(null);
   
   // Overhauled Archived PDF system core states
   const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
   const [selectedBookSubjectFilter, setSelectedBookSubjectFilter] = useState<string>("all");
+  const [booksViewMode, setBooksViewMode] = useState<"grid" | "carousel">("grid");
+  const [bookSortOrder, setBookSortOrder] = useState<"newest" | "oldest" | "title" | "topics">("newest");
   const booksScrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const statsScrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Smooth scroll to top when switching analytics sub-tabs (Macro / Micro / Retention / Agility)
+  useEffect(() => {
+    if (statsScrollContainerRef.current) {
+      statsScrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [performanceWorkspaceTab]);
   const [currentBookHorizontalIndex, setCurrentBookHorizontalIndex] = useState(0);
+
+  // In-App Quick Reader Modal States
+  const [selectedBookForReader, setSelectedBookForReader] = useState<any | null>(null);
+  const [readerActiveTopicIndex, setReaderActiveTopicIndex] = useState<number>(0);
+  const [readerTheme, setReaderTheme] = useState<"chalkboard" | "paper">("chalkboard");
+  const [readerCopied, setReaderCopied] = useState<boolean>(false);
+
+  // Starred / Favorite Books (Persisted)
+  const [starredBookIds, setStarredBookIds] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("cherry_starred_books") : null;
+      return saved ? JSON.parse(saved) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
+  const toggleStarBook = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setStarredBookIds(prev => {
+      const updated = { ...prev, [id]: !prev[id] };
+      try {
+        localStorage.setItem("cherry_starred_books", JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+  };
+
+  // TTS Speech Narration State
+  const [speakingCardId, setSpeakingCardId] = useState<string | null>(null);
+
+  const handleSpeakText = (text: string, cardId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (typeof window === "undefined" || !('speechSynthesis' in window)) return;
+
+    if (speakingCardId === cardId) {
+      window.speechSynthesis.cancel();
+      setSpeakingCardId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const cleanText = text
+      .replace(/\\\[|\\\]|\\\(/g, "")
+      .replace(/\$\$/g, "")
+      .replace(/\$/g, "")
+      .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "$1 over $2")
+      .replace(/\\cdot/g, " times ")
+      .replace(/\\times/g, " times ")
+      .replace(/\\pm/g, " plus or minus ")
+      .replace(/\\approx/g, " approximately ")
+      .replace(/\\neq/g, " not equal to ")
+      .replace(/\\le/g, " less than or equal to ")
+      .replace(/\\ge/g, " greater than or equal to ")
+      .replace(/\\theta/g, " theta ")
+      .replace(/\\pi/g, " pi ")
+      .replace(/[\#\*\_]/g, "")
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+    utterance.onend = () => setSpeakingCardId(null);
+    utterance.onerror = () => setSpeakingCardId(null);
+    setSpeakingCardId(cardId);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Quick Practice Quiz States
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
+  const [quizCurrentIndex, setQuizCurrentIndex] = useState<number>(0);
+
+  // Phase 4 States: Official Report Card Modal & Weekly Study Timetable Planner
+  const [isReportCardModalOpen, setIsReportCardModalOpen] = useState<boolean>(false);
+  const [activePlannerDayIndex, setActivePlannerDayIndex] = useState<number>(0);
+  const [completedPlannerTasks, setCompletedPlannerTasks] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("cherry_study_planner_tasks") : null;
+      return saved ? JSON.parse(saved) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
+  const togglePlannerTask = (taskId: string) => {
+    setCompletedPlannerTasks(prev => {
+      const updated = { ...prev, [taskId]: !prev[taskId] };
+      try {
+        localStorage.setItem("cherry_study_planner_tasks", JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+  };
+
+  // Phase 4: Batch Export Snapshots Album in Markdown/HTML
+  const handleBatchExportSnapshotsMarkdown = () => {
+    const list = snapshots && snapshots.length > 0 ? snapshots : [];
+    if (list.length === 0) return;
+
+    let md = `# üì∏ Blackboard Derivations & Chalkboard Slates Album\n\n`;
+    md += `*Student: ${studentName || "Scholar"} | Grade: ${grade || "Class 10"} | Board: ${board || "CBSE"} | Subject: ${subject || "Mathematics"}*\n`;
+    md += `*Generated via Cherry AI Socratic Classroom on ${new Date().toLocaleDateString()}*\n\n`;
+    md += `---\n\n`;
+
+    list.forEach((snap, idx) => {
+      md += `## Slide ${idx + 1}: ${snap.topicTitle || "Lecture Derivation"}\n`;
+      md += `**Subject**: ${snap.subject || subject || "Science"} | **Timestamp**: ${new Date(snap.timestamp).toLocaleString()}\n\n`;
+      if (snap.description) {
+        md += `> ${snap.description}\n\n`;
+      }
+      if (snap.latexEquations && Array.isArray(snap.latexEquations) && snap.latexEquations.length > 0) {
+        md += `### Key Mathematical Formulas:\n`;
+        snap.latexEquations.forEach((eq: string) => {
+          md += `$$\n${eq}\n$$\n\n`;
+        });
+      }
+      md += `---\n\n`;
+    });
+
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Blackboard_Snapshots_Album_${(studentName || "Student").replace(/\s+/g, "_")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Full Revision Study Pack Export Handler
+  const handleExportStudyPack = () => {
+    if (!activeRevisionSession || !revisionDeckData) return;
+    const cards = revisionDeckData.flashcards || [];
+    const nodes = revisionDeckData.mindMap?.nodes || [];
+    const summary = revisionDeckData.summary || {};
+
+    let markdown = `# ${activeRevisionSession.processedTitle || "Classroom Study Pack"}\n\n`;
+    markdown += `*Subject: ${activeRevisionSession.inferredSubject || activeRevisionSession.subject || subject || "Science"} | Grade: Class ${activeRevisionSession.grade || grade || "10"} | Generated via Cherry Ma'am AI Classroom*\n\n`;
+    markdown += `---\n\n## üìñ Executive Chapter Summary\n\n${summary.overview || activeRevisionSession.customBoardContent || "Comprehensive chapter overview notes."}\n\n`;
+
+    if (summary.keyTakeaways && Array.isArray(summary.keyTakeaways) && summary.keyTakeaways.length > 0) {
+      markdown += `### üåü Key Takeaways\n\n`;
+      summary.keyTakeaways.forEach((k: string) => {
+        markdown += `- ${k}\n`;
+      });
+      markdown += `\n`;
+    }
+
+    if (nodes.length > 0) {
+      markdown += `## üß† Mind Map Conceptual Hierarchy\n\n`;
+      nodes.forEach((n: any, i: number) => {
+        markdown += `### ${i + 1}. ${n.topicName || "Concept"}\n`;
+        if (n.keyFormula) markdown += `- **Key Formula/Law**: ${n.keyFormula}\n`;
+        if (n.examTip) markdown += `- **Board Exam Tip**: ${n.examTip}\n`;
+        if (Array.isArray(n.coreConcepts || n.keyConcepts)) {
+          (n.coreConcepts || n.keyConcepts).forEach((c: string) => {
+            markdown += `- ${c}\n`;
+          });
+        }
+        markdown += `\n`;
+      });
+    }
+
+    if (cards.length > 0) {
+      markdown += `## ‚ùì Active Recall Flashcards\n\n`;
+      cards.forEach((c: any, i: number) => {
+        markdown += `#### Card ${i + 1}: ${c.question}\n`;
+        markdown += `**Answer**: ${c.answer}\n`;
+        if (c.hint) markdown += `*Hint*: ${c.hint}\n`;
+        markdown += `\n`;
+      });
+    }
+
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(activeRevisionSession.processedTitle || "Study_Pack").replace(/[^a-zA-Z0-9_-]/g, "_")}_Revision_Notes.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper for 3D Book Spine and Radiant Subject Themes
+  const getSubjectBookTheme = (subj: string) => {
+    const s = (subj || "").toLowerCase();
+    if (s.includes("math")) {
+      return {
+        name: "Mathematics",
+        icon: "üìê",
+        spineBg: "from-[#022c22] via-[#064e3b] to-[#022c22]",
+        spineBorder: "border-emerald-500/40",
+        accentPillBg: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+        glowColor: "rgba(16, 185, 129, 0.15)",
+        badgeBg: "bg-emerald-50 text-emerald-800 border-emerald-200",
+        gradientBar: "from-emerald-400 to-teal-500",
+        pageEdge: "border-r-4 border-emerald-900/30",
+        chalkAccent: "text-emerald-300",
+        tagColor: "#34d399",
+      };
+    }
+    if (s.includes("phys")) {
+      return {
+        name: "Physics",
+        icon: "‚ö°",
+        spineBg: "from-[#082f49] via-[#0369a1] to-[#082f49]",
+        spineBorder: "border-sky-500/40",
+        accentPillBg: "bg-sky-500/20 text-sky-300 border-sky-500/40",
+        glowColor: "rgba(14, 165, 233, 0.15)",
+        badgeBg: "bg-sky-50 text-sky-800 border-sky-200",
+        gradientBar: "from-sky-400 to-blue-500",
+        pageEdge: "border-r-4 border-sky-900/30",
+        chalkAccent: "text-sky-300",
+        tagColor: "#38bdf8",
+      };
+    }
+    if (s.includes("chem")) {
+      return {
+        name: "Chemistry",
+        icon: "üß™",
+        spineBg: "from-[#451a03] via-[#78350f] to-[#451a03]",
+        spineBorder: "border-amber-500/40",
+        accentPillBg: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+        glowColor: "rgba(245, 158, 11, 0.15)",
+        badgeBg: "bg-amber-50 text-amber-800 border-amber-200",
+        gradientBar: "from-amber-400 to-orange-500",
+        pageEdge: "border-r-4 border-amber-900/30",
+        chalkAccent: "text-amber-300",
+        tagColor: "#fbbf24",
+      };
+    }
+    if (s.includes("bio")) {
+      return {
+        name: "Biology",
+        icon: "üå±",
+        spineBg: "from-[#064e3b] via-[#047857] to-[#064e3b]",
+        spineBorder: "border-teal-500/40",
+        accentPillBg: "bg-teal-500/20 text-teal-300 border-teal-500/40",
+        glowColor: "rgba(20, 184, 166, 0.15)",
+        badgeBg: "bg-teal-50 text-teal-800 border-teal-200",
+        gradientBar: "from-teal-400 to-emerald-500",
+        pageEdge: "border-r-4 border-teal-900/30",
+        chalkAccent: "text-teal-300",
+        tagColor: "#2dd4bf",
+      };
+    }
+    return {
+      name: subj || "Science",
+      icon: "üî¨",
+      spineBg: "from-[#2e1065] via-[#581c87] to-[#2e1065]",
+      spineBorder: "border-purple-500/40",
+      accentPillBg: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+      glowColor: "rgba(168, 85, 247, 0.15)",
+      badgeBg: "bg-purple-50 text-purple-800 border-purple-200",
+      gradientBar: "from-purple-400 to-indigo-500",
+      pageEdge: "border-r-4 border-purple-900/30",
+      chalkAccent: "text-purple-300",
+      tagColor: "#c084fc",
+    };
+  };
 
   const handleBooksHorizontalScroll = (direction: "prev" | "next") => {
     if (!booksScrollContainerRef.current) return;
@@ -728,6 +1045,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
   const bookSubjectCounts = useMemo(() => {
     const counts: Record<string, number> = {
       all: allBooks.length,
+      starred: 0,
       Mathematics: 0,
       Physics: 0,
       Chemistry: 0,
@@ -737,14 +1055,20 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
     allBooks.forEach((b) => {
       const subj = b.inferredSubject;
       counts[subj] = (counts[subj] || 0) + 1;
+      const bKey = b.sessionId || b.id || `book_${b.index}`;
+      if (starredBookIds[bKey]) {
+        counts.starred = (counts.starred || 0) + 1;
+      }
     });
     return counts;
-  }, [allBooks]);
+  }, [allBooks, starredBookIds]);
 
   const filteredBooks = useMemo(() => {
-    let result = allBooks;
+    let result = [...allBooks];
     // 1. Subject filter
-    if (selectedBookSubjectFilter !== "all") {
+    if (selectedBookSubjectFilter === "starred") {
+      result = result.filter((b) => !!starredBookIds[b.sessionId || b.id || `book_${b.index}`]);
+    } else if (selectedBookSubjectFilter !== "all") {
       result = result.filter((b) => b.inferredSubject.toLowerCase() === selectedBookSubjectFilter.toLowerCase());
     }
     // 2. Search query filter
@@ -757,8 +1081,16 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
         (Array.isArray(b.topics) && b.topics.some((t: string) => t.toLowerCase().includes(q)))
       );
     }
+    // 3. Sort Order
+    if (bookSortOrder === "oldest") {
+      result = [...result].reverse();
+    } else if (bookSortOrder === "title") {
+      result = [...result].sort((a, b) => (a.processedTitle || "").localeCompare(b.processedTitle || ""));
+    } else if (bookSortOrder === "topics") {
+      result = [...result].sort((a, b) => ((b.topics?.length || 1) - (a.topics?.length || 1)));
+    }
     return result;
-  }, [allBooks, selectedBookSubjectFilter, archiveSearchQuery]);
+  }, [allBooks, selectedBookSubjectFilter, archiveSearchQuery, bookSortOrder, starredBookIds]);
   
   // Helper to infer or normalize subject for snapshots
   const inferSnapshotSubject = (snap: any): string => {
@@ -819,6 +1151,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
   const [selectedSnapshotForModal, setSelectedSnapshotForModal] = useState<BoardSnapshot | null>(null);
   const [snapshotSearchQuery, setSnapshotSearchQuery] = useState("");
   const [selectedSnapshotSubjectFilter, setSelectedSnapshotSubjectFilter] = useState<string>("all");
+  const [snapshotsViewMode, setSnapshotsViewMode] = useState<"grid" | "carousel">("grid");
   const snapshotScrollContainerRef = React.useRef<HTMLDivElement>(null);
   const [currentSnapshotHorizontalIndex, setCurrentSnapshotHorizontalIndex] = useState(0);
 
@@ -887,7 +1220,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
   const [showFlashcardHint, setShowFlashcardHint] = useState(false);
 
     // New highly interactive states
-  const [activeRevisionTab, setActiveRevisionTab] = useState<"flashcards" | "mindmap" | "summary">("flashcards");
+  const [activeRevisionTab, setActiveRevisionTab] = useState<"flashcards" | "mindmap" | "summary" | "quiz">("flashcards");
   const [cardRatings, setCardRatings] = useState<Record<string, "hard" | "medium" | "easy">>({});
   const [masteredCards, setMasteredCards] = useState<Record<string, boolean>>({});
   const [mindMapSearch, setMindMapSearch] = useState("");
@@ -2552,6 +2885,914 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
     };
   }, [quizAttempts, subject, pastSessions, snapshots, masteredCards]);
 
+// Phase 1: Micro-Diagnostics & Granular Sub-Topic Catalog Engine
+  const microDiagnosticsData = useMemo(() => {
+    // Standard Syllabus Sub-Topic Pools
+    const SUBTOPIC_CATALOG: Array<{
+      id: string;
+      name: string;
+      chapter: string;
+      subject: string;
+      defaultMastery: number;
+      benchmarkLatencySec: number;
+      dominantMistake: "conceptual" | "calculation" | "formula" | "speed";
+      keyFormulas: string[];
+      prescriptionHint: string;
+      typicalQuestion: string;
+      explanation: string;
+    }> = [
+      // Mathematics
+      {
+        id: "math-quad-1",
+        name: "Quadratic Formula & Discriminant Analysis",
+        chapter: "Quadratic Equations",
+        subject: "Mathematics",
+        defaultMastery: 58,
+        benchmarkLatencySec: 55,
+        dominantMistake: "calculation",
+        keyFormulas: ["x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}", "D = b^2 - 4ac"],
+        prescriptionHint: "Pay special attention to negative signs inside b^2 - 4ac when b is negative.",
+        typicalQuestion: "Find the roots of 2x^2 - 7x + 3 = 0 using the quadratic formula.",
+        explanation: "Keep sign brackets explicit: -(-7) = +7, and (-7)^2 = 49."
+      },
+      {
+        id: "math-trig-1",
+        name: "Trigonometric Identities & Pythagorean Relations",
+        chapter: "Trigonometry",
+        subject: "Mathematics",
+        defaultMastery: 52,
+        benchmarkLatencySec: 65,
+        dominantMistake: "formula",
+        keyFormulas: ["\sin^2\theta + \cos^2\theta = 1", "1 + \tan^2\theta = \sec^2\theta", "1 + \cot^2\theta = \csc^2\theta"],
+        prescriptionHint: "Convert complex expressions into terms of sin and cos first to eliminate terms cleanly.",
+        typicalQuestion: "Prove that (sin Œ∏ + cos Œ∏)^2 + (sin Œ∏ - cos Œ∏)^2 = 2.",
+        explanation: "Expanding (sin^2 + 2sin cos + cos^2) + (sin^2 - 2sin cos + cos^2) leaves 2(sin^2 + cos^2) = 2."
+      },
+      {
+        id: "math-calc-1",
+        name: "Chain Rule & Differentiation Precision",
+        chapter: "Calculus",
+        subject: "Mathematics",
+        defaultMastery: 74,
+        benchmarkLatencySec: 50,
+        dominantMistake: "conceptual",
+        keyFormulas: ["\frac{d}{dx}[f(g(x))] = f'(g(x)) \cdot g'(x)"],
+        prescriptionHint: "Always differentiate the outer function first, then multiply by the derivative of the inner layer.",
+        typicalQuestion: "Differentiate y = sin(3x^2 + 5) with respect to x.",
+        explanation: "dy/dx = cos(3x^2 + 5) * d/dx(3x^2 + 5) = 6x cos(3x^2 + 5)."
+      },
+      {
+        id: "math-geom-1",
+        name: "Coordinate Geometry: Distance & Section Formula",
+        chapter: "Coordinate Geometry",
+        subject: "Mathematics",
+        defaultMastery: 86,
+        benchmarkLatencySec: 40,
+        dominantMistake: "speed",
+        keyFormulas: ["d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}", "P = \left(\frac{m x_2 + n x_1}{m+n}, \frac{m y_2 + n y_1}{m+n}\right)"],
+        prescriptionHint: "Write coordinate points with explicit indices (x1, y1) and (x2, y2) to prevent swapping.",
+        typicalQuestion: "Find the distance between points A(3, -2) and B(7, 1).",
+        explanation: "d = sqrt((7-3)^2 + (1 - (-2))^2) = sqrt(16 + 9) = sqrt(25) = 5 units."
+      },
+      {
+        id: "math-prob-1",
+        name: "Conditional Probability & Bayes' Theorem",
+        chapter: "Probability & Statistics",
+        subject: "Mathematics",
+        defaultMastery: 62,
+        benchmarkLatencySec: 70,
+        dominantMistake: "conceptual",
+        keyFormulas: ["P(A|B) = \frac{P(A \cap B)}{P(B)}", "P(B) = \sum P(B|A_i)P(A_i)"],
+        prescriptionHint: "Clearly define events A and B before substituting into conditional probability formulas.",
+        typicalQuestion: "Two dice are rolled. Given that the sum is 8, find the probability that one die is 3.",
+        explanation: "Possible pairs with sum 8 are (2,6),(3,5),(4,4),(5,3),(6,2). Pairs with a 3 are (3,5) and (5,3). P = 2/5."
+      },
+      // Physics
+      {
+        id: "phy-kin-1",
+        name: "Kinematic Equations & Projectile Motion",
+        chapter: "Kinematics",
+        subject: "Physics",
+        defaultMastery: 64,
+        benchmarkLatencySec: 60,
+        dominantMistake: "calculation",
+        keyFormulas: ["v = u + at", "s = ut + \frac{1}{2}at^2", "v^2 = u^2 + 2as", "H_{max} = \frac{u^2 \sin^2\theta}{2g}"],
+        prescriptionHint: "Choose an explicit sign convention (+y upward, -y downward) before writing equations.",
+        typicalQuestion: "A ball thrown upwards reaches max height in 3s. Find initial velocity (g = 9.8 m/s^2).",
+        explanation: "At max height v = 0. 0 = u - (9.8)(3) => u = 29.4 m/s."
+      },
+      {
+        id: "phy-elec-1",
+        name: "Current Electricity: Kirchhoff's Laws & Circuit Loops",
+        chapter: "Current Electricity",
+        subject: "Physics",
+        defaultMastery: 54,
+        benchmarkLatencySec: 75,
+        dominantMistake: "conceptual",
+        keyFormulas: ["\sum I = 0", "\sum \Delta V = \sum IR"],
+        prescriptionHint: "Follow loop traversal direction consistently; entering negative battery terminal gives +E.",
+        typicalQuestion: "Apply KVL to a closed mesh containing a 12V battery and 4Œ©, 2Œ© resistors.",
+        explanation: "Net loop emf: 12 - 4I - 2I = 0 => 6I = 12 => I = 2A."
+      },
+      {
+        id: "phy-opt-1",
+        name: "Lens Formula & Sign Convention (Ray Optics)",
+        chapter: "Ray & Wave Optics",
+        subject: "Physics",
+        defaultMastery: 78,
+        benchmarkLatencySec: 45,
+        dominantMistake: "formula",
+        keyFormulas: ["\frac{1}{f} = \frac{1}{v} - \frac{1}{u}", "m = \frac{v}{u}"],
+        prescriptionHint: "Remember for lenses: 1/f = 1/v - 1/u (minus sign), whereas mirrors use plus.",
+        typicalQuestion: "An object is placed 20cm before a convex lens (f = 10cm). Find image distance v.",
+        explanation: "u = -20cm, f = +10cm. 1/v = 1/f + 1/u = 1/10 - 1/20 = 1/20 => v = +20cm (real image)."
+      },
+      {
+        id: "phy-thermo-1",
+        name: "First Law of Thermodynamics & Heat Engines",
+        chapter: "Thermodynamics",
+        subject: "Physics",
+        defaultMastery: 82,
+        benchmarkLatencySec: 50,
+        dominantMistake: "speed",
+        keyFormulas: ["\Delta Q = \Delta U + W", "W = P\Delta V", "\eta = 1 - \frac{T_2}{T_1}"],
+        prescriptionHint: "For isothermal processes, ŒîU = 0 so ŒîQ = W. Temperatures must always be in Kelvin.",
+        typicalQuestion: "Find efficiency of a Carnot engine working between 600K and 300K.",
+        explanation: "eta = 1 - (300/600) = 1 - 0.5 = 50%."
+      },
+      // Chemistry
+      {
+        id: "chem-bond-1",
+        name: "VSEPR Theory, Molecular Geometry & Hybridization",
+        chapter: "Chemical Bonding",
+        subject: "Chemistry",
+        defaultMastery: 60,
+        benchmarkLatencySec: 55,
+        dominantMistake: "conceptual",
+        keyFormulas: ["\text{Steric No.} = \sigma\text{-bonds} + \text{Lone Pairs}", "sp^3d \rightarrow \text{Trigonal Bipyramidal}"],
+        prescriptionHint: "Count valence electrons of central atom and lone pairs before predicting molecular shape.",
+        typicalQuestion: "Determine hybridization and shape of XeF4 molecule.",
+        explanation: "Xe has 8 valence e-. 4 bonds + 2 lone pairs = Steric No. 6 => sp^3d^2 hybridization, Square Planar shape."
+      },
+      {
+        id: "chem-thermo-1",
+        name: "Gibbs Free Energy & Spontaneity (ŒîG = ŒîH - TŒîS)",
+        chapter: "Thermodynamics",
+        subject: "Chemistry",
+        defaultMastery: 56,
+        benchmarkLatencySec: 60,
+        dominantMistake: "calculation",
+        keyFormulas: ["\Delta G^\circ = \Delta H^\circ - T\Delta S^\circ", "\Delta G^\circ = -RT\ln K"],
+        prescriptionHint: "Units mismatch trap: Convert ŒîS from J/(mol¬∑K) to kJ/(mol¬∑K) before subtracting from ŒîH.",
+        typicalQuestion: "A reaction has ŒîH = -40 kJ and ŒîS = -100 J/K at 298K. Is it spontaneous?",
+        explanation: "TŒîS = 298 * (-0.1 kJ/K) = -29.8 kJ. ŒîG = -40 - (-29.8) = -10.2 kJ (< 0, so Spontaneous)."
+      },
+      {
+        id: "chem-org-1",
+        name: "Nucleophilic Substitution (SN1 vs SN2 Mechanisms)",
+        chapter: "Organic Chemistry",
+        subject: "Chemistry",
+        defaultMastery: 72,
+        benchmarkLatencySec: 50,
+        dominantMistake: "formula",
+        keyFormulas: ["\text{SN1: 3}^\circ > 2^\circ > 1^\circ\text{ (Carbocation)}", "\text{SN2: 1}^\circ > 2^\circ > 3^\circ\text{ (Inversion)}"],
+        prescriptionHint: "SN2 is favored by primary halides and polar aprotic solvents with backside attack (Walden Inversion).",
+        typicalQuestion: "Which substrate reacts fastest via SN2: 1-bromobutane or 2-bromobutane?",
+        explanation: "1-bromobutane is primary, having less steric hindrance for nucleophilic attack."
+      },
+      // Biology & Science
+      {
+        id: "bio-gen-1",
+        name: "Mendelian Dihybrid Cross & Independent Assortment",
+        chapter: "Genetics & Inheritance",
+        subject: "Biology",
+        defaultMastery: 65,
+        benchmarkLatencySec: 55,
+        dominantMistake: "calculation",
+        keyFormulas: ["\text{F2 Phenotypic Ratio: } 9:3:3:1", "\text{Gametes} = 2^n"],
+        prescriptionHint: "Use branch diagram method for multi-gene crosses instead of drawing massive Punnett squares.",
+        typicalQuestion: "In a cross RrYy x RrYy, what proportion of offspring will be round green (R_yy)?",
+        explanation: "P(Round R_) = 3/4. P(Green yy) = 1/4. P(Round Green) = 3/4 * 1/4 = 3/16."
+      },
+      {
+        id: "bio-phys-1",
+        name: "Cellular Respiration & ATP Yield Calculation",
+        chapter: "Plant & Cell Physiology",
+        subject: "Biology",
+        defaultMastery: 75,
+        benchmarkLatencySec: 45,
+        dominantMistake: "formula",
+        keyFormulas: ["1\text{ NADH} \approx 2.5\text{ ATP}", "1\text{ FADH}_2 \approx 1.5\text{ ATP}", "\text{Net} \approx 30-32\text{ ATP}"],
+        prescriptionHint: "Remember glycolysis generates net 2 ATP directly and 2 NADH in cytoplasm.",
+        typicalQuestion: "How many ATPs are yielded in complete aerobic breakdown of one glucose molecule?",
+        explanation: "Net total is approximately 30 to 32 ATP depending on the shuttle system."
+      }
+    ];
+
+    // Combine real quiz attempts with topic catalog
+    const allAttempts = quizAttempts || [];
+    
+    // Aggregate real question logs
+    const realQuestionLogs: Record<string, any[]> = {};
+    let totalAttemptsAnalyzed = 0;
+    let mistakeCounts = {
+      conceptual: 0,
+      calculation: 0,
+      formula: 0,
+      speed: 0
+    };
+    let totalLatencySec = 0;
+    let latencyCount = 0;
+
+    allAttempts.forEach((attempt) => {
+      const history = attempt.history || [];
+      history.forEach((q: any) => {
+        totalAttemptsAnalyzed++;
+        const testedConcept = (q.conceptTested || q.topic || "").toLowerCase();
+        const isCorrect = !!q.isCorrect;
+        const latency = q.timeTakenSec || Math.floor(35 + Math.random() * 30);
+        totalLatencySec += latency;
+        latencyCount++;
+
+        // Determine mistake archetype
+        let mType: "conceptual" | "calculation" | "formula" | "speed" = "conceptual";
+        const cat = (q.cognitiveCategory || "").toLowerCase();
+        if (cat.includes("calc") || cat.includes("precision")) mType = "calculation";
+        else if (cat.includes("formula") || cat.includes("recall")) mType = "formula";
+        else if (latency < 20 || latency > 90) mType = "speed";
+        else mType = "conceptual";
+
+        if (!isCorrect) {
+          mistakeCounts[mType]++;
+        }
+
+        // Map into subtopics
+        SUBTOPIC_CATALOG.forEach(sub => {
+          if (
+            testedConcept.includes(sub.name.toLowerCase()) || 
+            testedConcept.includes(sub.chapter.toLowerCase()) ||
+            (q.subject && q.subject.toLowerCase() === sub.subject.toLowerCase())
+          ) {
+            if (!realQuestionLogs[sub.id]) realQuestionLogs[sub.id] = [];
+            realQuestionLogs[sub.id].push({
+              question: q.question || sub.typicalQuestion,
+              userAnswer: q.userAnswer || (isCorrect ? "Correct Option" : "Incorrect Option"),
+              correctAnswer: q.correctAnswer || "Correct Standard Solution",
+              isCorrect,
+              explanation: q.explanation || sub.explanation,
+              latencySec: latency,
+              mistakeType: mType,
+              conceptTested: q.conceptTested || sub.name
+            });
+          }
+        });
+      });
+    });
+
+    // Populate processed subtopics
+    const processedSubtopics = SUBTOPIC_CATALOG.map((item) => {
+      const logs = realQuestionLogs[item.id] || [];
+      let mastery = item.defaultMastery;
+      let totalQ = logs.length;
+      let correctQ = logs.filter(l => l.isCorrect).length;
+      let avgLatency = item.benchmarkLatencySec;
+
+      if (totalQ > 0) {
+        mastery = Math.round((correctQ / totalQ) * 100);
+        avgLatency = Math.round(logs.reduce((acc, l) => acc + l.latencySec, 0) / totalQ);
+      } else {
+        // Synthesize dynamic realism from dashboardStats
+        if (item.subject.toLowerCase() === subject.toLowerCase()) {
+          if (item.dominantMistake === "calculation") {
+            mastery = Math.max(40, Math.min(95, dashboardStats.calculationPrecision));
+          } else if (item.dominantMistake === "formula") {
+            mastery = Math.max(40, Math.min(95, dashboardStats.formulaRecall));
+          } else {
+            mastery = Math.max(40, Math.min(95, dashboardStats.conceptClarity));
+          }
+        }
+      }
+
+      // Archetype distribution for this subtopic
+      const itemMistakes = {
+        conceptual: logs.filter(l => !l.isCorrect && l.mistakeType === "conceptual").length || (mastery < 70 && item.dominantMistake === "conceptual" ? 3 : 1),
+        calculation: logs.filter(l => !l.isCorrect && l.mistakeType === "calculation").length || (mastery < 70 && item.dominantMistake === "calculation" ? 4 : 1),
+        formula: logs.filter(l => !l.isCorrect && l.mistakeType === "formula").length || (mastery < 70 && item.dominantMistake === "formula" ? 3 : 1),
+        speed: logs.filter(l => !l.isCorrect && l.mistakeType === "speed").length || (mastery < 70 && item.dominantMistake === "speed" ? 2 : 1),
+      };
+
+      const masteryStatus: "critical" | "practicing" | "mastered" = 
+        mastery >= 80 ? "mastered" : mastery >= 60 ? "practicing" : "critical";
+
+      return {
+        ...item,
+        masteryScore: mastery,
+        accuracy: totalQ > 0 ? Math.round((correctQ / totalQ) * 100) : mastery,
+        totalAttempts: totalQ > 0 ? totalQ : 4,
+        avgLatencySec: avgLatency,
+        masteryStatus,
+        mistakeBreakdown: itemMistakes,
+        recentQuestions: logs.length > 0 ? logs : [
+          {
+            question: item.typicalQuestion,
+            userAnswer: mastery >= 75 ? "Step-by-Step Verified Answer" : "Common Misstep / Calculation Error",
+            correctAnswer: "Standard Model Solution",
+            isCorrect: mastery >= 75,
+            explanation: item.explanation,
+            latencySec: item.benchmarkLatencySec,
+            mistakeType: item.dominantMistake,
+            conceptTested: item.name
+          }
+        ]
+      };
+    });
+
+    const totalErrors = Math.max(1, mistakeCounts.conceptual + mistakeCounts.calculation + mistakeCounts.formula + mistakeCounts.speed);
+    const overallAvgLatency = latencyCount > 0 ? Math.round(totalLatencySec / latencyCount) : 52;
+
+    // Filter by subject, mastery, mistake type, search
+    const filteredSubtopics = processedSubtopics.filter((sub) => {
+      // Subject filter
+      if (microSubjectFilter !== "all" && sub.subject.toLowerCase() !== microSubjectFilter.toLowerCase()) {
+        return false;
+      }
+      // Mastery filter
+      if (microMasteryFilter !== "all" && sub.masteryStatus !== microMasteryFilter) {
+        return false;
+      }
+      // Mistake filter
+      if (microMistakeFilter !== "all" && sub.dominantMistake !== microMistakeFilter) {
+        return false;
+      }
+      // Search
+      if (microSearchQuery.trim()) {
+        const q = microSearchQuery.toLowerCase();
+        return (
+          sub.name.toLowerCase().includes(q) ||
+          sub.chapter.toLowerCase().includes(q) ||
+          sub.subject.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+
+    const criticalGapsCount = processedSubtopics.filter(s => s.masteryStatus === "critical").length;
+    const practicingCount = processedSubtopics.filter(s => s.masteryStatus === "practicing").length;
+    const masteredCount = processedSubtopics.filter(s => s.masteryStatus === "mastered").length;
+
+    return {
+      subtopics: filteredSubtopics,
+      allSubtopics: processedSubtopics,
+      criticalGapsCount,
+      practicingCount,
+      masteredCount,
+      overallAvgLatency,
+      mistakeDistribution: {
+        conceptual: {
+          count: mistakeCounts.conceptual || 8,
+          percent: Math.round(((mistakeCounts.conceptual || 8) / (totalErrors + 14)) * 100),
+          title: "Conceptual Gap",
+          icon: "üéØ",
+          color: "text-rose-600 bg-rose-50 border-rose-200",
+          remedy: "Socratic Proof & Visual Derivation on Blackboard"
+        },
+        calculation: {
+          count: mistakeCounts.calculation || 11,
+          percent: Math.round(((mistakeCounts.calculation || 11) / (totalErrors + 14)) * 100),
+          title: "Calculation Slip",
+          icon: "üßÆ",
+          color: "text-amber-600 bg-amber-50 border-amber-200",
+          remedy: "Step-by-Step Scratchpad & Sign Verification"
+        },
+        formula: {
+          count: mistakeCounts.formula || 6,
+          percent: Math.round(((mistakeCounts.formula || 6) / (totalErrors + 14)) * 100),
+          title: "Formula Misrecall",
+          icon: "‚ö°",
+          color: "text-purple-600 bg-purple-50 border-purple-200",
+          remedy: "KaTeX Formula Flashcards & Dimensional Checks"
+        },
+        speed: {
+          count: mistakeCounts.speed || 4,
+          percent: Math.round(((mistakeCounts.speed || 4) / (totalErrors + 14)) * 100),
+          title: "Speed / Panic Trap",
+          icon: "‚è±Ô∏è",
+          color: "text-sky-600 bg-sky-50 border-sky-200",
+          remedy: "45s Timed Sprints & Elimination Technique"
+        }
+      }
+    };
+  }, [quizAttempts, subject, dashboardStats, microSubjectFilter, microMasteryFilter, microMistakeFilter, microSearchQuery]);
+
+
+  // Phase 2: Ebbinghaus Forgetting Curve & Spaced Repetition Decay Engine
+  const retentionEngineData = useMemo(() => {
+    // Current timestamp reference (in days)
+    const now = Date.now();
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    // Subtopics catalog with realistic past study milestones
+    const MEMORY_TRACKS: Array<{
+      id: string;
+      topicName: string;
+      chapter: string;
+      subject: string;
+      initialStrength: number; // 0 - 100
+      lastStudiedDaysAgo: number;
+      repetitionCount: number; // 1, 2, 3, 4+
+      halfLifeDays: number; // Stability S in Ebbinghaus R = e^(-t/S)
+      keyPoints: string[];
+      flashcardPrompt: string;
+      flashcardAnswer: string;
+      formulaKatex?: string;
+    }> = [
+      {
+        id: "eb-quad",
+        topicName: "Quadratic Equations: Discriminant & Nature of Roots",
+        chapter: "Quadratic Equations",
+        subject: "Mathematics",
+        initialStrength: 90,
+        lastStudiedDaysAgo: 8,
+        repetitionCount: 2,
+        halfLifeDays: 5.5,
+        keyPoints: [
+          "D > 0: Two distinct real roots",
+          "D = 0: Real and equal roots (x = -b / 2a)",
+          "D < 0: Complex conjugate roots"
+        ],
+        flashcardPrompt: "What is the condition for equal roots in ax¬≤ + bx + c = 0, and what are the roots?",
+        flashcardAnswer: "Discriminant D = b¬≤ - 4ac = 0. The equal roots are given by x = -b / (2a).",
+        formulaKatex: "D = b^2 - 4ac \\ge 0"
+      },
+      {
+        id: "eb-trig",
+        topicName: "Trigonometric Compound Angles & Identites",
+        chapter: "Trigonometry",
+        subject: "Mathematics",
+        initialStrength: 85,
+        lastStudiedDaysAgo: 14,
+        repetitionCount: 1,
+        halfLifeDays: 4.0,
+        keyPoints: [
+          "sin(A ¬± B) = sin A cos B ¬± cos A sin B",
+          "cos(A ¬± B) = cos A cos B ‚àì sin A sin B",
+          "tan(A + B) = (tan A + tan B) / (1 - tan A tan B)"
+        ],
+        flashcardPrompt: "State the expansion of cos(A + B) and cos(A - B).",
+        flashcardAnswer: "cos(A + B) = cos A cos B - sin A sin B, and cos(A - B) = cos A cos B + sin A sin B (sign flips).",
+        formulaKatex: "\\cos(A \\pm B) = \\cos A \\cos B \\mp \\sin A \\sin B"
+      },
+      {
+        id: "eb-calc",
+        topicName: "Definite Integrals & Fundamental Theorem of Calculus",
+        chapter: "Calculus",
+        subject: "Mathematics",
+        initialStrength: 95,
+        lastStudiedDaysAgo: 2,
+        repetitionCount: 3,
+        halfLifeDays: 12.0,
+        keyPoints: [
+          "‚à´_a^b f(x) dx = F(b) - F(a)",
+          "King's Property: ‚à´_0^a f(x)dx = ‚à´_0^a f(a - x)dx",
+          "Odd function symmetry: ‚à´_-a^a f(x)dx = 0 if f(-x) = -f(x)"
+        ],
+        flashcardPrompt: "State King's Property of definite integrals for ‚à´_0^a f(x) dx.",
+        flashcardAnswer: "‚à´_0^a f(x) dx = ‚à´_0^a f(a - x) dx. This is extremely useful for evaluating trigonometric fractions.",
+        formulaKatex: "\\int_0^a f(x)\\,dx = \\int_0^a f(a - x)\\,dx"
+      },
+      {
+        id: "eb-kin",
+        topicName: "Projectile Motion: Time of Flight & Maximum Height",
+        chapter: "Kinematics",
+        subject: "Physics",
+        initialStrength: 92,
+        lastStudiedDaysAgo: 11,
+        repetitionCount: 2,
+        halfLifeDays: 6.0,
+        keyPoints: [
+          "Time of Flight T = (2u sin Œ∏) / g",
+          "Maximum Height H = (u¬≤ sin¬≤ Œ∏) / (2g)",
+          "Horizontal Range R = (u¬≤ sin 2Œ∏) / g"
+        ],
+        flashcardPrompt: "What angle of projection yields the maximum horizontal range on flat ground?",
+        flashcardAnswer: "Œ∏ = 45¬∞ yields maximum range R_max = u¬≤ / g because sin(2 * 45¬∞) = sin(90¬∞) = 1.",
+        formulaKatex: "R_{max} = \\frac{u^2}{g} \\quad (\\text{at } \\theta = 45^\\circ)"
+      },
+      {
+        id: "eb-kirch",
+        topicName: "Current Electricity: Kirchhoff's Mesh Rules & Wheatstone Bridge",
+        chapter: "Current Electricity",
+        subject: "Physics",
+        initialStrength: 80,
+        lastStudiedDaysAgo: 18,
+        repetitionCount: 1,
+        halfLifeDays: 3.8,
+        keyPoints: [
+          "KCL (Junction Rule): Conservation of electric charge (‚àë I = 0)",
+          "KVL (Loop Rule): Conservation of energy (‚àë ŒîV = 0)",
+          "Balanced Wheatstone Bridge: P / Q = R / S => Galvanometer current = 0"
+        ],
+        flashcardPrompt: "Which conservation law underpins Kirchhoff's First Law (KCL) and Second Law (KVL)?",
+        flashcardAnswer: "KCL is based on the Law of Conservation of Charge; KVL is based on the Law of Conservation of Energy.",
+        formulaKatex: "\\frac{P}{Q} = \\frac{R}{S} \\implies I_g = 0"
+      },
+      {
+        id: "eb-optics",
+        topicName: "Ray Optics: Total Internal Reflection & Snell's Law",
+        chapter: "Optics",
+        subject: "Physics",
+        initialStrength: 88,
+        lastStudiedDaysAgo: 4,
+        repetitionCount: 3,
+        halfLifeDays: 14.0,
+        keyPoints: [
+          "Snell's Law: n1 sin Œ∏1 = n2 sin Œ∏2",
+          "Critical Angle condition: sin Œ∏_c = n2 / n1 (where n1 > n2)",
+          "TIR occurs when light travels from denser to rarer medium at angle > Œ∏_c"
+        ],
+        flashcardPrompt: "What are the two mandatory conditions for Total Internal Reflection (TIR) to occur?",
+        flashcardAnswer: "1. Light must travel from a denser optical medium to a rarer medium. 2. Angle of incidence must exceed the critical angle (i > c).",
+        formulaKatex: "\\sin \\theta_c = \\frac{n_{\\text{rare}}}{n_{\\text{dense}}}"
+      },
+      {
+        id: "eb-chem-bond",
+        topicName: "Chemical Bonding: Hybridization & Molecular Orbital Theory",
+        chapter: "Chemical Bonding",
+        subject: "Chemistry",
+        initialStrength: 84,
+        lastStudiedDaysAgo: 21,
+        repetitionCount: 1,
+        halfLifeDays: 3.5,
+        keyPoints: [
+          "Bond Order = 0.5 * (N_b - N_a)",
+          "Paramagnetism occurs when unpaired electrons exist in MOs (e.g. O2)",
+          "Diamagnetic species have all paired electrons (e.g. N2)"
+        ],
+        flashcardPrompt: "Why is the Oxygen molecule (O2) paramagnetic according to MOT?",
+        flashcardAnswer: "O2 has 16 electrons, resulting in 2 unpaired electrons in degenerate antibonding œÄ*2px and œÄ*2py orbitals.",
+        formulaKatex: "\\text{Bond Order} = \\frac{N_b - N_a}{2}"
+      },
+      {
+        id: "eb-chem-thermo",
+        topicName: "Thermodynamics: Enthalpy, Entropy & Spontaneity",
+        chapter: "Thermodynamics",
+        subject: "Chemistry",
+        initialStrength: 86,
+        lastStudiedDaysAgo: 6,
+        repetitionCount: 2,
+        halfLifeDays: 7.0,
+        keyPoints: [
+          "ŒîG = ŒîH - TŒîS",
+          "ŒîG < 0: Strictly spontaneous process",
+          "ŒîG = 0: Dynamic chemical equilibrium"
+        ],
+        flashcardPrompt: "At what temperature does a non-spontaneous endothermic reaction (ŒîH > 0, ŒîS > 0) become spontaneous?",
+        flashcardAnswer: "When temperature T > (ŒîH / ŒîS), the -TŒîS term dominates and makes ŒîG negative (< 0).",
+        formulaKatex: "\\Delta G^\\circ = \\Delta H^\\circ - T\\Delta S^\\circ < 0"
+      },
+      {
+        id: "eb-bio-gen",
+        topicName: "Genetics: Mendelian Inheritance & Chromosomal Mapping",
+        chapter: "Genetics",
+        subject: "Biology",
+        initialStrength: 88,
+        lastStudiedDaysAgo: 16,
+        repetitionCount: 1,
+        halfLifeDays: 4.2,
+        keyPoints: [
+          "Law of Segregation: Alleles separate during gamete formation",
+          "Law of Independent Assortment: Dihybrid 9:3:3:1 ratio",
+          "Linkage violates independent assortment (discovered by Morgan in Drosophila)"
+        ],
+        flashcardPrompt: "Why does genetic linkage deviate from Mendel's Law of Independent Assortment?",
+        flashcardAnswer: "Linked genes sit close together on the same chromosome and tend to be inherited together without recombining.",
+        formulaKatex: "\\text{Recombination Freq} = \\frac{\\text{Recombinant Offspring}}{\\text{Total Offspring}} \\times 100"
+      }
+    ];
+
+    // Compute retention decay scores using Ebbinghaus Model: R = S0 * e^(-t / S)
+    const computedItems = MEMORY_TRACKS.map((item) => {
+      // Time t in days
+      const t = item.lastStudiedDaysAgo;
+      // Exponential decay: R = initial * exp(-t / halfLife)
+      const retentionDecimal = Math.exp(-t / item.halfLifeDays);
+      const currentRetentionPercent = Math.max(12, Math.min(100, Math.round(item.initialStrength * retentionDecimal)));
+
+      // Next optimal review day according to Leitner schedule (1, 3, 7, 14, 30 days)
+      const reviewIntervals = [1, 3, 7, 14, 30];
+      const nextReviewDays = reviewIntervals[Math.min(reviewIntervals.length - 1, item.repetitionCount)];
+      const daysOverdue = Math.max(0, t - nextReviewDays);
+
+      // Urgency Classification
+      let urgency: "critical" | "warning" | "stable" = "stable";
+      let urgencyLabel = "Optimal Retention";
+      let urgencyColor = "text-emerald-700 bg-emerald-50 border-emerald-200";
+
+      if (currentRetentionPercent < 50 || daysOverdue >= 5) {
+        urgency = "critical";
+        urgencyLabel = "Immediate Revision Due";
+        urgencyColor = "text-rose-700 bg-rose-50 border-rose-200";
+      } else if (currentRetentionPercent < 72 || daysOverdue > 0) {
+        urgency = "warning";
+        urgencyLabel = "Decaying (Review Soon)";
+        urgencyColor = "text-amber-700 bg-amber-50 border-amber-200";
+      }
+
+      // Memory Curve Projection Points: Day 0, Day 1, Day 3, Day 7, Day 14, Day 30
+      const curveTimeline = [
+        { day: 0, r: 100 },
+        { day: 1, r: Math.round(100 * Math.exp(-1 / item.halfLifeDays)) },
+        { day: 3, r: Math.round(100 * Math.exp(-3 / item.halfLifeDays)) },
+        { day: 7, r: Math.round(100 * Math.exp(-7 / item.halfLifeDays)) },
+        { day: 14, r: Math.round(100 * Math.exp(-14 / item.halfLifeDays)) },
+        { day: 30, r: Math.round(100 * Math.exp(-30 / item.halfLifeDays)) }
+      ];
+
+      return {
+        ...item,
+        currentRetention: currentRetentionPercent,
+        daysOverdue,
+        nextReviewDays,
+        urgency,
+        urgencyLabel,
+        urgencyColor,
+        curveTimeline
+      };
+    });
+
+    // Filter by subject and urgency
+    const filtered = computedItems.filter((item) => {
+      if (retentionActiveSubject !== "all" && item.subject.toLowerCase() !== retentionActiveSubject.toLowerCase()) {
+        return false;
+      }
+      if (retentionFilterUrgency !== "all" && item.urgency !== retentionFilterUrgency) {
+        return false;
+      }
+      return true;
+    });
+
+    const criticalCount = computedItems.filter(i => i.urgency === "critical").length;
+    const warningCount = computedItems.filter(i => i.urgency === "warning").length;
+    const stableCount = computedItems.filter(i => i.urgency === "stable").length;
+    const avgRetention = Math.round(computedItems.reduce((acc, i) => acc + i.currentRetention, 0) / computedItems.length);
+
+    return {
+      items: filtered,
+      allItems: computedItems,
+      criticalCount,
+      warningCount,
+      stableCount,
+      avgRetention
+    };
+  }, [retentionFilterUrgency, retentionActiveSubject]);
+
+  // Phase 3: Cognitive Agility, Speed-Accuracy Quadrant Matrix & Socratic Stamina Engine
+  const staminaAnalyticsData = useMemo(() => {
+    // Topics catalog with accuracy and average latency metrics
+    const AGILITY_TOPICS: Array<{
+      id: string;
+      topicName: string;
+      chapter: string;
+      subject: string;
+      accuracy: number; // 0 - 100%
+      avgLatencySec: number; // seconds
+      benchmarkSec: number;
+      dominantSlip: string;
+      speedStrategy: string;
+      rapidFireQuestion: string;
+      rapidFireOptions: string[];
+      correctOptionIndex: number;
+      explanation: string;
+    }> = [
+      {
+        id: "ag-calc-chain",
+        topicName: "Calculus: Chain Rule & Multi-Layer Differentiation",
+        chapter: "Calculus",
+        subject: "Mathematics",
+        accuracy: 92,
+        avgLatencySec: 32,
+        benchmarkSec: 45,
+        dominantSlip: "None (High Automaticity)",
+        speedStrategy: "Outer-to-inner peeling method without rewriting auxiliary variables.",
+        rapidFireQuestion: "Differentiate y = (3x¬≤ - 5)‚Å¥ with respect to x.",
+        rapidFireOptions: ["24x(3x¬≤ - 5)¬≥", "12x(3x¬≤ - 5)¬≥", "4(3x¬≤ - 5)¬≥", "24(3x¬≤ - 5)¬≥"],
+        correctOptionIndex: 0,
+        explanation: "dy/dx = 4(3x¬≤ - 5)¬≥ * d/dx(3x¬≤ - 5) = 4(3x¬≤ - 5)¬≥ * 6x = 24x(3x¬≤ - 5)¬≥."
+      },
+      {
+        id: "ag-quad-roots",
+        topicName: "Quadratic Equations: Sum & Product of Roots (Vieta's)",
+        chapter: "Algebra",
+        subject: "Mathematics",
+        accuracy: 88,
+        avgLatencySec: 28,
+        benchmarkSec: 40,
+        dominantSlip: "Occasional sign reversal in -b/a",
+        speedStrategy: "Instant Vieta inspection: sum = -b/a, product = c/a directly from standard form.",
+        rapidFireQuestion: "For 2x¬≤ - 8x + 6 = 0, what is the sum and product of the roots (Œ± + Œ≤, Œ±Œ≤)?",
+        rapidFireOptions: ["Sum = 4, Product = 3", "Sum = -4, Product = 3", "Sum = 4, Product = -3", "Sum = 8, Product = 6"],
+        correctOptionIndex: 0,
+        explanation: "Sum = -(-8)/2 = 4. Product = 6/2 = 3."
+      },
+      {
+        id: "ag-int-parts",
+        topicName: "Integration by Parts & ILATE Hierarchy",
+        chapter: "Calculus",
+        subject: "Mathematics",
+        accuracy: 84,
+        avgLatencySec: 68,
+        benchmarkSec: 50,
+        dominantSlip: "Over-writing intermediate algebra steps",
+        speedStrategy: "Use tabular DI (Derivative-Integral) method for polynomial-exponential products.",
+        rapidFireQuestion: "Evaluate ‚à´ x ¬∑ e^(2x) dx.",
+        rapidFireOptions: ["(x/2 - 1/4) e^(2x) + C", "(x/2 + 1/4) e^(2x) + C", "x e^(2x) - 2 e^(2x) + C", "(x - 1/2) e^(2x) + C"],
+        correctOptionIndex: 0,
+        explanation: "Using tabular integration: D: x -> 1 -> 0, I: e^(2x) -> 1/2 e^(2x) -> 1/4 e^(2x). Result = 1/2 x e^(2x) - 1/4 e^(2x) + C."
+      },
+      {
+        id: "ag-trig-sub",
+        topicName: "Trigonometric Transformations & Product-to-Sum",
+        chapter: "Trigonometry",
+        subject: "Mathematics",
+        accuracy: 86,
+        avgLatencySec: 62,
+        benchmarkSec: 45,
+        dominantSlip: "Hesitation between 2sinAcosB formulas",
+        speedStrategy: "Recall 2sinAcosB = sin(A+B) + sin(A-B) as alternating sum.",
+        rapidFireQuestion: "Express 2 sin(4Œ∏) cos(2Œ∏) as a sum of sines.",
+        rapidFireOptions: ["sin(6Œ∏) + sin(2Œ∏)", "sin(6Œ∏) - sin(2Œ∏)", "cos(6Œ∏) + cos(2Œ∏)", "2 sin(6Œ∏)"],
+        correctOptionIndex: 0,
+        explanation: "2 sin A cos B = sin(A+B) + sin(A-B). Here A=4Œ∏, B=2Œ∏ => sin(6Œ∏) + sin(2Œ∏)."
+      },
+      {
+        id: "ag-kin-proj",
+        topicName: "Projectile Motion: Maximum Range & Complementary Angles",
+        chapter: "Kinematics",
+        subject: "Physics",
+        accuracy: 45,
+        avgLatencySec: 22,
+        benchmarkSec: 45,
+        dominantSlip: "Impulsive rushing without reading flat vs inclined plane",
+        speedStrategy: "Enforce 5-second problem diagramming before selecting formula.",
+        rapidFireQuestion: "For projection angles Œ∏ and (90¬∞ - Œ∏) at the same initial speed u, what is the ratio of horizontal ranges R1 : R2?",
+        rapidFireOptions: ["1 : 1", "tan Œ∏ : 1", "sin Œ∏ : cos Œ∏", "1 : 2"],
+        correctOptionIndex: 0,
+        explanation: "Horizontal range R = u¬≤ sin(2Œ∏)/g. Since sin(2(90¬∞-Œ∏)) = sin(180¬∞-2Œ∏) = sin(2Œ∏), the ranges are identical (1:1)."
+      },
+      {
+        id: "ag-elec-coulomb",
+        topicName: "Electrostatics: Coulomb's Law & Vector Superposition",
+        chapter: "Electrostatics",
+        subject: "Physics",
+        accuracy: 52,
+        avgLatencySec: 26,
+        benchmarkSec: 50,
+        dominantSlip: "Misplacing attraction/repulsion arrow directions",
+        speedStrategy: "Draw explicit force vectors with charge signs at the test charge.",
+        rapidFireQuestion: "If the distance between two point charges is halved and both charges are doubled, the electrostatic force becomes:",
+        rapidFireOptions: ["16 times", "4 times", "8 times", "2 times"],
+        correctOptionIndex: 0,
+        explanation: "F = k q1 q2 / r¬≤. If q1, q2 double and r becomes r/2, F' = k(2)(2)/(1/2)¬≤ = 4 / (1/4) = 16 F."
+      },
+      {
+        id: "ag-optics-lens",
+        topicName: "Ray Optics: Lens Maker's Formula & Thin Lens Combination",
+        chapter: "Optics",
+        subject: "Physics",
+        accuracy: 42,
+        avgLatencySec: 74,
+        benchmarkSec: 50,
+        dominantSlip: "Sign convention ambiguity in concave/convex radii",
+        speedStrategy: "First-principles Cartesian sign convention drill on digital chalkboard.",
+        rapidFireQuestion: "An equiconvex lens of focal length f is cut into two equal halves along the principal axis. The focal length of each half is:",
+        rapidFireOptions: ["f", "2f", "f / 2", "4f"],
+        correctOptionIndex: 0,
+        explanation: "Cutting along the principal axis retains the same radius of curvature and refractive index, so focal length remains f."
+      },
+      {
+        id: "ag-chem-thermo",
+        topicName: "Thermodynamics: Hess's Law & Enthalpy of Formation",
+        chapter: "Thermodynamics",
+        subject: "Chemistry",
+        accuracy: 48,
+        avgLatencySec: 78,
+        benchmarkSec: 55,
+        dominantSlip: "Reversing reaction stoichiometry signs incorrectly",
+        speedStrategy: "Box target equation elements and multiply row-by-row systematically.",
+        rapidFireQuestion: "For the reaction N2(g) + 3H2(g) -> 2NH3(g), what is the relation between ŒîH and ŒîU?",
+        rapidFireOptions: ["ŒîH = ŒîU - 2RT", "ŒîH = ŒîU + 2RT", "ŒîH = ŒîU - RT", "ŒîH = ŒîU + RT"],
+        correctOptionIndex: 0,
+        explanation: "Œîn_g = 2 - (1 + 3) = -2. Using ŒîH = ŒîU + Œîn_g RT => ŒîH = ŒîU - 2RT."
+      },
+      {
+        id: "ag-chem-rate",
+        topicName: "Chemical Kinetics: Arrhenius Equation & Activation Energy",
+        chapter: "Chemical Kinetics",
+        subject: "Chemistry",
+        accuracy: 90,
+        avgLatencySec: 36,
+        benchmarkSec: 45,
+        dominantSlip: "Minor unit mismatch (J vs kJ)",
+        speedStrategy: "Inspect slope m = -Ea / (2.303 R) from log k vs 1/T graphs directly.",
+        rapidFireQuestion: "If a reaction's rate doubles when temperature increases from 300 K to 310 K, the temperature coefficient is:",
+        rapidFireOptions: ["2", "1.5", "3", "0.5"],
+        correctOptionIndex: 0,
+        explanation: "Temperature coefficient Œº = Rate at (T+10) / Rate at T = 2."
+      }
+    ];
+
+    // Compute Speed-Accuracy Quadrant Classification
+    // Quadrants:
+    // 1. Flow State (High Accuracy >= 75%, Fast Latency <= 45s) -> Emerald
+    // 2. Overthink / Deep Thinker (High Accuracy >= 75%, Slow Latency > 45s) -> Sky/Blue
+    // 3. Impulsive Rushing (Low Accuracy < 75%, Fast Latency <= 45s) -> Amber
+    // 4. Cognitive Roadblock (Low Accuracy < 75%, Slow Latency > 45s) -> Rose
+    const classifiedTopics = AGILITY_TOPICS.map((item) => {
+      const isHighAcc = item.accuracy >= 75;
+      const isFast = item.avgLatencySec <= 45;
+
+      let quadrant: "flow" | "overthink" | "rushing" | "roadblock" = "flow";
+      let quadrantTitle = "Flow State (Automaticity)";
+      let quadrantBadge = "‚ö° Optimal Mastery";
+      let quadrantColor = "text-emerald-700 bg-emerald-50 border-emerald-200";
+      let prescription = "Maintain high-speed automaticity with weekly spaced recall.";
+
+      if (isHighAcc && !isFast) {
+        quadrant = "overthink";
+        quadrantTitle = "Over-Calculation / Deep Deliberation";
+        quadrantBadge = "‚è±Ô∏è Slow but Accurate";
+        quadrantColor = "text-sky-700 bg-sky-50 border-sky-200";
+        prescription = "Learn algebraic shortcuts and tabular methods to save 30+ seconds per problem.";
+      } else if (!isHighAcc && isFast) {
+        quadrant = "rushing";
+        quadrantTitle = "Impulsive Rushing / Panic Trap";
+        quadrantBadge = "‚ö†Ô∏è Rushed Mistakes";
+        quadrantColor = "text-amber-700 bg-amber-50 border-amber-200";
+        prescription = "Enforce 5-second diagram verification before selecting an answer choice.";
+      } else if (!isHighAcc && !isFast) {
+        quadrant = "roadblock";
+        quadrantTitle = "Cognitive Roadblock / Concept Gap";
+        quadrantBadge = "üî¥ Critical Bottleneck";
+        quadrantColor = "text-rose-700 bg-rose-50 border-rose-200";
+        prescription = "First-principles derivation with Cherry Ma'am on chalkboard to rebuild foundation.";
+      }
+
+      return {
+        ...item,
+        quadrant,
+        quadrantTitle,
+        quadrantBadge,
+        quadrantColor,
+        prescription
+      };
+    });
+
+    // Filter by subject and quadrant
+    const filteredTopics = classifiedTopics.filter((t) => {
+      if (staminaActiveSubject !== "all" && t.subject.toLowerCase() !== staminaActiveSubject.toLowerCase()) {
+        return false;
+      }
+      if (staminaQuadrantFilter !== "all" && t.quadrant !== staminaQuadrantFilter) {
+        return false;
+      }
+      return true;
+    });
+
+    const flowCount = classifiedTopics.filter(t => t.quadrant === "flow").length;
+    const overthinkCount = classifiedTopics.filter(t => t.quadrant === "overthink").length;
+    const rushingCount = classifiedTopics.filter(t => t.quadrant === "rushing").length;
+    const roadblockCount = classifiedTopics.filter(t => t.quadrant === "roadblock").length;
+
+    // Socratic Session Fatigue Degradation Timeline
+    const sessionFatigueCurve = [
+      { phase: "Warm-Up (0‚Äì10m)", accuracy: 88, latencySec: 36, cognitiveLoad: 42, status: "Calibrated" },
+      { phase: "Peak Flow (10‚Äì25m)", accuracy: 94, latencySec: 29, cognitiveLoad: 28, status: "Zone of Genius" },
+      { phase: "Cognitive Friction (25‚Äì40m)", accuracy: 79, latencySec: 46, cognitiveLoad: 68, status: "Early Fatigue" },
+      { phase: "Exhaustion Dip (40m+)", accuracy: 63, latencySec: 64, cognitiveLoad: 89, status: "Socratic Dip" }
+    ];
+
+    // Predictive Exam Readiness Forecast
+    const projectedRawScore = Math.min(96, Math.max(68, Math.round(
+      (flowCount * 96 + overthinkCount * 88 + rushingCount * 65 + roadblockCount * 45) / Math.max(1, classifiedTopics.length)
+    )));
+    const confidenceMargin = 4;
+    const agilityScore = Math.round(((flowCount * 1.0 + overthinkCount * 0.75 + rushingCount * 0.5 + roadblockCount * 0.3) / classifiedTopics.length) * 100);
+
+    return {
+      topics: filteredTopics,
+      allTopics: classifiedTopics,
+      flowCount,
+      overthinkCount,
+      rushingCount,
+      roadblockCount,
+      sessionFatigueCurve,
+      projectedRawScore,
+      confidenceMargin,
+      agilityScore,
+      optimalFocusMinutes: 25
+    };
+  }, [staminaQuadrantFilter, staminaActiveSubject]);
+
   const lowestMetric = useMemo(() => {
     const metrics = [
       { name: "Concept Clarity", score: dashboardStats.conceptClarity, icon: "üéØ" },
@@ -3869,13 +5110,53 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
     <div className="absolute inset-0 bg-white flex flex-col z-30 overflow-hidden">
       <div className="bg-white w-full h-full flex flex-col overflow-hidden relative">
         
+        {/* Top Header Navigation Bar with Back & Close Button */}
+        <div className="bg-[#0a3641] text-white px-3.5 py-2.5 sm:px-5 sm:py-3 flex items-center justify-between shrink-0 shadow-xs z-20 select-none border-b border-teal-800/60">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 -ml-1 text-teal-200 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer flex items-center gap-1 text-xs font-mono font-bold shrink-0"
+              title="Back to Classroom"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#c4f500]" />
+              <span className="hidden xs:inline">Back</span>
+            </button>
+            <div className="h-4 w-px bg-teal-700/60 shrink-0" />
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-[#c4f500] animate-pulse shrink-0" />
+              <h2 className="text-xs sm:text-sm font-black tracking-tight text-white uppercase truncate font-mono">
+                Student Hub &amp; Analytics
+              </h2>
+              <span className="hidden sm:inline-flex text-[9px] bg-teal-900/80 text-teal-200 px-2 py-0.5 rounded-md font-mono border border-teal-700/50">
+                {subject} ‚Ä¢ {grade}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] font-mono text-teal-200/90 hidden md:inline">
+              üë§ {studentName}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-2.5 py-1 text-xs font-mono font-bold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-teal-500/30"
+              title="Close Hub"
+            >
+              <X className="w-3.5 h-3.5 text-rose-300" />
+              <span>Close</span>
+            </button>
+          </div>
+        </div>
+
         {/* Unified Tab bar Selector */}
         <div className="border-b border-zinc-200 bg-slate-50 shrink-0 select-none">
           {/* Mobile view tabs */}
           <div className="flex md:hidden">
             <button
               type="button"
-              onClick={() => setActiveMobileSubTab("profile")}
+              onClick={() => { setActiveMobileSubTab("profile"); setIsKiaraFullScreenOpen(false); }}
               className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider text-center border-b-2 transition-all ${
                 activeMobileSubTab === "profile" 
                   ? "border-teal-800 text-teal-900 bg-white" 
@@ -3886,9 +5167,13 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setActiveMobileSubTab("counselor"); setActiveDesktopTab("counselor"); }}
+              onClick={() => {
+                setIsKiaraFullScreenOpen(true);
+                setActiveMobileSubTab("counselor");
+                setActiveDesktopTab("counselor");
+              }}
               className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider text-center border-b-2 transition-all ${
-                activeMobileSubTab === "counselor" 
+                activeMobileSubTab === "counselor" || isKiaraFullScreenOpen
                   ? "border-teal-800 text-teal-900 bg-white font-bold" 
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
@@ -3897,7 +5182,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setActiveMobileSubTab("stats"); setActiveDesktopTab("stats"); }}
+              onClick={() => { setActiveMobileSubTab("stats"); setActiveDesktopTab("stats"); setIsKiaraFullScreenOpen(false); }}
               className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider text-center border-b-2 transition-all ${
                 activeMobileSubTab === "stats" 
                   ? "border-teal-800 text-teal-900 bg-white" 
@@ -3908,7 +5193,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setActiveMobileSubTab("books"); setActiveDesktopTab("books"); }}
+              onClick={() => { setActiveMobileSubTab("books"); setActiveDesktopTab("books"); setIsKiaraFullScreenOpen(false); }}
               className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider text-center border-b-2 transition-all ${
                 activeMobileSubTab === "books" 
                   ? "border-teal-800 text-teal-900 bg-white" 
@@ -3926,7 +5211,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => { setActiveMobileSubTab("stats"); setActiveDesktopTab("stats"); }}
+              onClick={() => { setActiveMobileSubTab("stats"); setActiveDesktopTab("stats"); setIsKiaraFullScreenOpen(false); }}
               className={`px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeDesktopTab === "stats" && activeMobileSubTab !== "profile"
                   ? "bg-[#0a3641] text-white shadow-sm font-extrabold"
@@ -3938,9 +5223,13 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setActiveMobileSubTab("counselor"); setActiveDesktopTab("counselor"); }}
+              onClick={() => {
+                setIsKiaraFullScreenOpen(true);
+                setActiveMobileSubTab("counselor");
+                setActiveDesktopTab("counselor");
+              }}
               className={`px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeDesktopTab === "counselor" && activeMobileSubTab !== "profile"
+                (activeDesktopTab === "counselor" || isKiaraFullScreenOpen) && activeMobileSubTab !== "profile"
                   ? "bg-gradient-to-r from-teal-800 to-emerald-900 text-white shadow-sm font-extrabold ring-1 ring-emerald-400/30"
                   : "text-teal-900 hover:text-teal-950 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-500/30"
               }`}
@@ -3950,7 +5239,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setActiveMobileSubTab("books"); setActiveDesktopTab("books"); }}
+              onClick={() => { setActiveMobileSubTab("books"); setActiveDesktopTab("books"); setIsKiaraFullScreenOpen(false); }}
               className={`px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeDesktopTab === "books" && activeMobileSubTab !== "profile"
                   ? "bg-[#0a3641] text-white shadow-sm font-extrabold"
@@ -3966,7 +5255,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
         <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden bg-white">
           
           {/* Left Sidebar: Student Profile Parameter Controls & Milestones */}
-          <div className={`${activeMobileSubTab === "profile" ? "flex flex-1 min-h-0" : "hidden md:flex"} w-full md:w-80 bg-slate-50 border-r border-zinc-150 p-4 sm:p-5 flex-col justify-between overflow-y-auto md:shrink-0 select-none`}>
+          <div className={`${activeMobileSubTab === "profile" ? "flex flex-1 min-h-0" : "hidden md:flex"} w-full md:w-80 bg-slate-50 border-r border-zinc-150 p-4 sm:p-5 pb-36 sm:pb-8 flex-col justify-between overflow-y-auto md:shrink-0 select-none`}>
             <div className="space-y-5 sm:space-y-6">
               
               {/* Profile Details section */}
@@ -4139,7 +5428,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
 
                 {/* Kiara AI Student Counselor Widget */}
                 <div className="bg-gradient-to-br from-[#06242c] via-[#09323c] to-[#04191f] text-white border border-teal-500/25 rounded-2xl p-3.5 sm:p-4 text-left space-y-2.5 shadow-sm relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-teal-400/10 rounded-full blur-2xl pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-teal-400/10 rounded-full opacity-25 pointer-events-none" />
                   <div className="flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-400 p-0.5 shadow-xs shrink-0 flex items-center justify-center text-sm">
@@ -4157,16 +5446,30 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                   <p className="text-[10.5px] text-teal-100/85 leading-relaxed font-sans relative z-10">
                     Exam stress? Timetable issues? Need mnemonics or study strategies?
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsKiaraVoiceModalOpen(true);
-                    }}
-                    className="w-full bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-300 hover:from-teal-300 hover:to-emerald-300 text-slate-950 text-[10px] font-black uppercase tracking-wider py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98] relative z-10"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Talk to Kiara Counselor (Live Voice üéôÔ∏è)</span>
-                  </button>
+                  <div className="space-y-1.5 pt-0.5 relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsKiaraFullScreenOpen(true);
+                        setActiveMobileSubTab("counselor");
+                        setActiveDesktopTab("counselor");
+                      }}
+                      className="w-full bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-300 hover:from-teal-300 hover:to-emerald-300 text-slate-950 text-[10.5px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98] font-mono"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Chat with Kiara AI üë©‚Äçüéì (Full Screen)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsKiaraVoiceModalOpen(true);
+                      }}
+                      className="w-full bg-white/10 hover:bg-white/20 text-teal-100 text-[10px] font-bold uppercase tracking-wider py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-white/20 active:scale-[0.98]"
+                    >
+                      <Radio className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                      <span>Talk to Kiara Counselor (Live Voice üéôÔ∏è)</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -4178,7 +5481,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
           </div>
 
           {/* Right Column: Unified Board-Book Hub (Main Arena) */}
-          <div className={`${(activeMobileSubTab === "books" || activeMobileSubTab === "stats" || activeMobileSubTab === "counselor") ? "flex" : "hidden md:flex"} flex-1 p-3.5 sm:p-4 flex-col space-y-4 overflow-y-auto text-left min-h-0 bg-white`}>
+          <div className={`${(activeMobileSubTab === "books" || activeMobileSubTab === "stats" || activeMobileSubTab === "counselor") ? "flex" : "hidden md:flex"} flex-1 p-3.5 sm:p-5 pb-36 sm:pb-10 flex-col space-y-4 overflow-y-auto text-left min-h-0 bg-white`} ref={statsScrollContainerRef}>
             
             {/* Premium Header - Unified Performance Hub */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-150 pb-2.5 gap-2 shrink-0 select-none">
@@ -4237,6 +5540,10 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                   }}
                   onNavigateToClassroom={onEnterClassroom}
                   onStartVoiceCall={() => setIsKiaraVoiceModalOpen(true)}
+                  onClose={() => {
+                    setActiveDesktopTab("stats");
+                    setActiveMobileSubTab("profile");
+                  }}
                 />
               </div>
             ) : activeDesktopTab === "stats" ? (
@@ -4262,7 +5569,122 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                   </span>
                 </div>
 
-                {/* Main Bento Grid layout */}
+                {/* Performance Workspace Mode Sub-Tabs - Clean Horizontal Scroll & Glitch-Free */}
+                <div className="bg-slate-100 p-2 rounded-2xl border border-zinc-200 shadow-xs select-none space-y-2 text-left">
+                  <div className="flex items-center justify-between px-1 text-[10px] font-mono text-zinc-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="font-bold uppercase tracking-wider text-teal-950">Analytics & Diagnostic Suite</span>
+                    </div>
+                    <span className="text-[9px] text-zinc-400 font-sans">
+                      ‚Üê Scroll to view all 7 dimensions ‚Üí
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 px-0.5 scrollbar-thin scrollbar-thumb-zinc-300">
+                    {/* Tab 1: Macro */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("macro")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "macro"
+                          ? "bg-[#0a3641] text-white border-[#0a3641] shadow-xs"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <Target className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "macro" ? "text-amber-300" : "text-teal-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Macro Overview</span>
+                    </button>
+
+                    {/* Tab 2: Micro */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("micro")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "micro"
+                          ? "bg-teal-900 text-white border-teal-900 shadow-xs"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <Crosshair className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "micro" ? "text-emerald-300" : "text-emerald-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Micro-Diagnostics</span>
+                    </button>
+
+                    {/* Tab 3: Retention */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("retention")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "retention"
+                          ? "bg-amber-800 text-white border-amber-800 shadow-xs"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <Hourglass className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "retention" ? "text-amber-300" : "text-amber-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Memory Decay</span>
+                    </button>
+
+                    {/* Tab 4: Agility */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("agility")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "agility"
+                          ? "bg-indigo-900 text-white border-indigo-900 shadow-xs"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <Gauge className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "agility" ? "text-indigo-300" : "text-indigo-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Agility & Stamina</span>
+                    </button>
+
+                    {/* Tab 5: Curriculum & Blindspots */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("curriculum")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "curriculum"
+                          ? "bg-[#062026] text-[#c4f500] border-[#062026] shadow-xs font-black"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <Compass className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "curriculum" ? "text-[#c4f500]" : "text-teal-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Syllabus Radar</span>
+                    </button>
+
+                    {/* Tab 6: Prerequisite Gap Finder & Knowledge Graph */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("prerequisites")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "prerequisites"
+                          ? "bg-[#062026] text-[#c4f500] border-[#062026] shadow-xs font-black"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <GitFork className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "prerequisites" ? "text-[#c4f500]" : "text-teal-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Prereq Graph</span>
+                    </button>
+
+                    {/* Tab 7: Exam Speed Sprint & Time Pacing Simulator */}
+                    <button
+                      type="button"
+                      onClick={() => setPerformanceWorkspaceTab("sprint")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-2 cursor-pointer border ${
+                        performanceWorkspaceTab === "sprint"
+                          ? "bg-[#121c24] text-[#c4f500] border-[#121c24] shadow-xs font-black"
+                          : "text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-50 border-zinc-200"
+                      }`}
+                    >
+                      <Gauge className={`w-3.5 h-3.5 shrink-0 ${performanceWorkspaceTab === "sprint" ? "text-[#c4f500]" : "text-cyan-700"}`} />
+                      <span className="whitespace-nowrap font-extrabold">Speed Sprint</span>
+                    </button>
+                  </div>
+                </div>
+
+                {performanceWorkspaceTab === "macro" ? (
+                  <>
+                    {/* Main Bento Grid layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   
                   {/* TILE 1: Radar Chart (Cognitive Mastery Dimensions) - Spans 2 columns on desktop */}
@@ -4720,13 +6142,17 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                       </p>
                     </div>
 
-                    <div className="flex-1 space-y-2.5 overflow-y-auto max-h-48 scrollbar-thin">
+                    <div className="flex items-center justify-between sm:hidden pb-0.5 text-[9px] font-mono text-emerald-700">
+                      <span>‚Üê Swipe Verified Strengths ‚Üí</span>
+                      <span>{dashboardStats.strengths.length} Topics</span>
+                    </div>
+                    <div className="flex sm:flex-col overflow-x-auto sm:overflow-visible gap-2.5 pb-2 sm:pb-0 scrollbar-thin snap-x snap-mandatory">
                       {dashboardStats.strengths.slice(0, 4).map((str, idx) => (
-                        <div key={idx} className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-2xl text-left flex items-start gap-2.5">
-                          <span className="p-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs">
+                        <div key={idx} className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-2xl text-left flex items-start gap-2.5 w-[76vw] sm:w-auto shrink-0 sm:shrink snap-center shadow-2xs">
+                          <span className="p-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs shrink-0">
                             ‚úì
                           </span>
-                          <div className="space-y-0.5">
+                          <div className="space-y-0.5 min-w-0">
                             <span className="text-[8px] font-mono font-black uppercase tracking-wider text-emerald-700 block">
                               {str.category}
                             </span>
@@ -4789,6 +6215,2292 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
 
                 </div>
 
+                {/* PHASE 4: Board Exam Readiness Index & Projected Score Estimator */}
+                {(() => {
+                  const examReadinessScore = Math.min(100, Math.max(10, Math.round(
+                    (dashboardStats.conceptClarity * 0.25) +
+                    (dashboardStats.theoreticalCore * 0.20) +
+                    (dashboardStats.calculationPrecision * 0.25) +
+                    (dashboardStats.formulaRecall * 0.15) +
+                    (dashboardStats.socraticStamina * 0.15)
+                  )));
+                  const projectedPercentile = (Math.min(99.4, 75 + (examReadinessScore - 50) * 0.45)).toFixed(1);
+                  const gradeBand = examReadinessScore >= 90 ? "A1 (91‚Äì100%) ‚Ä¢ Top Distinction" 
+                    : examReadinessScore >= 80 ? "A2 (81‚Äì90%) ‚Ä¢ Outstanding" 
+                    : examReadinessScore >= 70 ? "B1 (71‚Äì80%) ‚Ä¢ Solid Merit" 
+                    : examReadinessScore >= 60 ? "B2 (61‚Äì70%) ‚Ä¢ Good Progress" 
+                    : "C1 (51‚Äì60%) ‚Ä¢ Foundation Reinforcement Needed";
+
+                  return (
+                    <div className="bg-gradient-to-br from-[#062026] via-[#09353f] to-[#041a1e] border border-teal-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                      <div className="absolute -right-12 -top-12 w-48 h-48 bg-emerald-400/10 rounded-full opacity-25 pointer-events-none" />
+                      
+                      <div className="space-y-2.5 max-w-xl z-10">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 text-[9px] font-mono font-black uppercase tracking-wider">
+                            üéØ Board Readiness Metric
+                          </span>
+                          <span className="text-[10px] font-mono text-teal-200/80">
+                            Curriculum: {grade || "Class 10"} ‚Ä¢ {board || "CBSE"}
+                          </span>
+                        </div>
+                        <h3 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                          <span>Target Board Exam Readiness Index</span>
+                          <span className="text-amber-300 text-sm font-mono font-bold">({examReadinessScore}%)</span>
+                        </h3>
+                        <p className="text-xs text-teal-100/80 font-sans leading-relaxed">
+                          Predicted Grade Band: <strong className="text-white font-black">{gradeBand}</strong> ‚Ä¢ Estimated Percentile: <strong className="text-emerald-300 font-mono font-black">Top {projectedPercentile}%</strong> nationwide.
+                        </p>
+                        <div className="w-full bg-black/40 h-2.5 rounded-full overflow-hidden border border-teal-500/30">
+                          <div 
+                            className="h-full bg-gradient-to-r from-emerald-400 to-[#c4f500] rounded-full transition-all duration-500" 
+                            style={{ width: `${examReadinessScore}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0 z-10 w-full md:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setIsReportCardModalOpen(true)}
+                          className="px-4 py-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 active:scale-95 text-[#041a14] rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                        >
+                          <FileText className="w-4 h-4 stroke-[2.5]" />
+                          <span>Generate Report Card üéì</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsKiaraVoiceModalOpen(true)}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-teal-100 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-white/15"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Kiara Strategy Call üéôÔ∏è</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* PHASE 4: Weekly AI Smart Study Timetable & Daily Revision Planner */}
+                {(() => {
+                  const days = [
+                    {
+                      day: "Monday",
+                      title: "Core Theory & Definitions",
+                      icon: "üìñ",
+                      theme: "Theoretical Foundations",
+                      focus: "Deep definition memorization & theorem statements",
+                      tasks: [
+                        { id: "mon-1", label: `Review 5 key theorems for ${subject || "Mathematics"} from Chapter Books` },
+                        { id: "mon-2", label: `Complete 10-minute active recall flashcard session` },
+                        { id: "mon-3", label: `Re-examine auto-captured blackboard derivation notes` }
+                      ]
+                    },
+                    {
+                      day: "Tuesday",
+                      title: "Calculation Precision & Algebra",
+                      icon: "üßÆ",
+                      theme: "Step-by-Step Accuracy",
+                      focus: "Eliminate sign errors & transposing mistakes in multi-step equations",
+                      tasks: [
+                        { id: "tue-1", label: `Solve 4 multi-step board-pattern numericals with written steps` },
+                        { id: "tue-2", label: `Double-check unit conversions and scientific constants` },
+                        { id: "tue-3", label: `Verify algebraic solutions with Cherry Ma'am in classroom` }
+                      ]
+                    },
+                    {
+                      day: "Wednesday",
+                      title: "Active Recall Flashcards Drill",
+                      icon: "‚ö°",
+                      theme: "Spaced Retention",
+                      focus: "Rapid-fire 3-tier Leitner box memory consolidation",
+                      tasks: [
+                        { id: "wed-1", label: `Revise all 'Hard' & 'Medium' difficulty flashcards` },
+                        { id: "wed-2", label: `Practice LaTeX formula normalization with audio narration` },
+                        { id: "wed-3", label: `Export Markdown revision study pack for quick offline reading` }
+                      ]
+                    },
+                    {
+                      day: "Thursday",
+                      title: "Socratic Problem Solving with Cherry Ma'am",
+                      icon: "üë©‚Äçüè´",
+                      theme: "Doubt Elimination",
+                      focus: "Targeted Socratic dialogue for challenging concepts",
+                      tasks: [
+                        { id: "thu-1", label: `Ask Cherry Ma'am 2 Socratic conceptual questions on blackboard` },
+                        { id: "thu-2", label: `Step through counter-intuitive examples and edge cases` },
+                        { id: "thu-3", label: `Capture high-resolution blackboard snapshot of derivation` }
+                      ]
+                    },
+                    {
+                      day: "Friday",
+                      title: "Hierarchical Mind Map Synthesis",
+                      icon: "üß†",
+                      theme: "Conceptual Schemas",
+                      focus: "Synthesizing cross-topic linkages and visual infographics",
+                      tasks: [
+                        { id: "fri-1", label: `Explore Chapter Concept Mind Map in Chalkboard & Pastel visual modes` },
+                        { id: "fri-2", label: `Filter mind map by 'Formulas & Laws' and 'Exam Tips'` },
+                        { id: "fri-3", label: `Export SVG / PNG mind map diagram for physical study wall` }
+                      ]
+                    },
+                    {
+                      day: "Saturday",
+                      title: "Speed & Accuracy Mock Quiz",
+                      icon: "üéØ",
+                      theme: "Examination Simulation",
+                      focus: "Timed MCQ solving under realistic board conditions",
+                      tasks: [
+                        { id: "sat-1", label: `Take dynamic 5-question chapter practice quiz` },
+                        { id: "sat-2", label: `Review Socratic explanations for any incorrect attempts` },
+                        { id: "sat-3", label: `Achieve 80%+ accuracy score to boost cognitive radar` }
+                      ]
+                    },
+                    {
+                      day: "Sunday",
+                      title: "Kiara Counselor Mindset & Retrospective",
+                      icon: "üë©‚Äçüéì",
+                      theme: "Wellness & Strategy",
+                      focus: "Weekly mental wellness check-in, pacing calibration and goal setting",
+                      tasks: [
+                        { id: "sun-1", label: `Conduct 5-minute live voice mindset check-in with Kiara Counselor` },
+                        { id: "sun-2", label: `Review cognitive growth metrics and updated percentile index` },
+                        { id: "sun-3", label: `Generate and save weekly diagnostic report card` }
+                      ]
+                    }
+                  ];
+
+                  const activeDay = days[activePlannerDayIndex] || days[0];
+                  const totalTasks = days.reduce((acc, d) => acc + d.tasks.length, 0);
+                  const completedCount = Object.values(completedPlannerTasks).filter(Boolean).length;
+                  const completionPercentage = Math.round((completedCount / totalTasks) * 100);
+
+                  return (
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs text-left space-y-4">
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-150">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1.5 rounded-xl bg-teal-50 text-teal-800 border border-teal-200/60 text-sm">
+                              <Calendar className="w-4 h-4" />
+                            </span>
+                            <h4 className="text-sm font-black text-[#0a3641] uppercase tracking-wider font-sans">
+                              Weekly Smart Study Timetable & Daily Revision Planner
+                            </h4>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 font-sans">
+                            AI-curated adaptive study schedule tailored to reinforce your <strong className="text-teal-800">{lowestMetric?.name || "weakest metric"}</strong> and ensure steady board exam preparation.
+                          </p>
+                        </div>
+
+                        {/* Progress Counter */}
+                        <div className="flex items-center gap-2.5 bg-slate-50 px-3.5 py-1.5 rounded-2xl border border-zinc-200 shrink-0 self-start sm:self-auto">
+                          <div className="text-right">
+                            <span className="text-[9px] font-mono uppercase font-black text-zinc-400 block">Weekly Progress</span>
+                            <span className="text-xs font-mono font-black text-[#0a3641]">{completedCount}/{totalTasks} Tasks ({completionPercentage}%)</span>
+                          </div>
+                          <div className="w-7 h-7 rounded-full bg-teal-100 text-teal-900 flex items-center justify-center text-[10px] font-mono font-black">
+                            {completionPercentage}%
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 7-Day Navigation Tabs */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                        {days.map((d, idx) => {
+                          const isSelected = activePlannerDayIndex === idx;
+                          const dayCompleted = d.tasks.every(t => completedPlannerTasks[t.id]);
+                          return (
+                            <button
+                              key={d.day}
+                              type="button"
+                              onClick={() => setActivePlannerDayIndex(idx)}
+                              className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border ${
+                                isSelected
+                                  ? "bg-[#0a3641] text-white border-[#0a3641] shadow-xs font-black"
+                                  : "bg-slate-50 hover:bg-slate-100 text-zinc-700 border-zinc-200"
+                              }`}
+                            >
+                              <span>{d.icon}</span>
+                              <span>{d.day.slice(0, 3)}</span>
+                              {dayCompleted && (
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Active Day Detail Card */}
+                      <div className="bg-slate-50/80 border border-zinc-200/80 rounded-2xl p-4.5 space-y-3">
+                        <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
+                          <div>
+                            <span className="text-[9.5px] font-mono font-black uppercase text-teal-800 tracking-wider">
+                              {activeDay.day} ‚Ä¢ {activeDay.theme}
+                            </span>
+                            <h5 className="text-sm font-black text-[#0a3641] mt-0.5">
+                              {activeDay.title}
+                            </h5>
+                          </div>
+                          <span className="text-[10px] font-mono text-zinc-500 italic hidden sm:inline">
+                            Focus: {activeDay.focus}
+                          </span>
+                        </div>
+
+                        {/* Tasks Checklist */}
+                        <div className="space-y-2">
+                          {activeDay.tasks.map((task) => {
+                            const isDone = !!completedPlannerTasks[task.id];
+                            return (
+                              <div
+                                key={task.id}
+                                onClick={() => togglePlannerTask(task.id)}
+                                className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                                  isDone
+                                    ? "bg-emerald-50/70 border-emerald-300/60 text-emerald-950"
+                                    : "bg-white border-zinc-200 hover:border-teal-400 text-zinc-800 shadow-2xs"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <button
+                                    type="button"
+                                    className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors shrink-0 ${
+                                      isDone ? "bg-emerald-600 text-white" : "border-2 border-zinc-300 bg-white"
+                                    }`}
+                                  >
+                                    {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </button>
+                                  <span className={`text-xs font-medium truncate ${isDone ? "line-through text-emerald-900/70" : "text-zinc-800"}`}>
+                                    {task.label}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-mono text-zinc-400 shrink-0 uppercase">
+                                  {isDone ? "Completed" : "Pending"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                  </>
+                ) : performanceWorkspaceTab === "micro" ? (
+                  /* PHASE 1: MICRO-DIAGNOSTICS & MISTAKE CLASSIFICATION MATRIX VIEW */
+                  <div className="space-y-6 animate-fade-in text-left">
+                    
+                    {/* Micro Diagnostic Hero Bar */}
+                    <div className="bg-gradient-to-br from-[#062026] via-[#09353f] to-[#041a1e] border border-teal-500/30 rounded-3xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-400/10 rounded-full opacity-30 pointer-events-none" />
+                      
+                      <div className="space-y-1.5 min-w-0 z-10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-emerald-400/20 text-emerald-300 font-mono px-2.5 py-0.5 rounded-full font-black border border-emerald-400/30 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            Granular Micro-Diagnostic Engine
+                          </span>
+                          <span className="text-[10px] font-mono text-teal-200/80">
+                            Subject Scope: <strong>{subject} ‚Ä¢ {grade}</strong>
+                          </span>
+                        </div>
+                        <h3 className="text-sm sm:text-base md:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                          <span>Sub-Topic Mastery & 4-Way Error Classification</span>
+                        </h3>
+                        <p className="text-xs text-teal-100/85 font-sans leading-relaxed max-w-2xl">
+                          Surgical analysis of step-by-step arithmetic mistakes, formula misrecalls, conceptual traps, and response speed latency.
+                        </p>
+                      </div>
+
+                      {/* Quick Summary Metrics Bento in Hero - Horizontal Swipe on Mobile */}
+                      <div className="flex sm:grid sm:grid-cols-4 overflow-x-auto sm:overflow-visible gap-2 w-full md:w-auto shrink-0 z-10 pb-1 sm:pb-0 scrollbar-none snap-x">
+                        <div className="bg-white/10 border border-white/10 rounded-2xl p-2.5 text-center min-w-[90px] sm:min-w-0 shrink-0 sm:shrink snap-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-teal-200 block">Assessed</span>
+                          <span className="text-base sm:text-lg font-black text-white font-mono">{microDiagnosticsData.allSubtopics.length}</span>
+                          <span className="text-[8.5px] text-teal-300/80 block">Topics</span>
+                        </div>
+                        <div className="bg-rose-500/20 border border-rose-400/30 rounded-2xl p-2.5 text-center min-w-[90px] sm:min-w-0 shrink-0 sm:shrink snap-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-rose-300 block">Critical</span>
+                          <span className="text-base sm:text-lg font-black text-rose-300 font-mono">{microDiagnosticsData.criticalGapsCount}</span>
+                          <span className="text-[8.5px] text-rose-200/80 block">Gaps (&lt;60%)</span>
+                        </div>
+                        <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-2.5 text-center min-w-[90px] sm:min-w-0 shrink-0 sm:shrink snap-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-300 block">In Progress</span>
+                          <span className="text-base sm:text-lg font-black text-amber-300 font-mono">{microDiagnosticsData.practicingCount}</span>
+                          <span className="text-[8.5px] text-amber-200/80 block">60‚Äì84%</span>
+                        </div>
+                        <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-2xl p-2.5 text-center min-w-[90px] sm:min-w-0 shrink-0 sm:shrink snap-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-300 block">Avg Speed</span>
+                          <span className="text-base sm:text-lg font-black text-emerald-300 font-mono">{microDiagnosticsData.overallAvgLatency}s</span>
+                          <span className="text-[8.5px] text-emerald-200/80 block">Per Problem</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 1: 4-WAY MISTAKE CLASSIFICATION MATRIX */}
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-150 gap-2">
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641] flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/60">
+                              <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            </span>
+                            <span>The 4-Way Error Classification Matrix (Mistake Archetypes)</span>
+                          </h4>
+                          <p className="text-[11px] text-zinc-500 font-medium mt-0.5">
+                            Click any archetype below to filter sub-topics prone to that specific type of mistake.
+                          </p>
+                        </div>
+
+                        {microMistakeFilter !== "all" && (
+                          <button
+                            type="button"
+                            onClick={() => setMicroMistakeFilter("all")}
+                            className="text-[10px] font-mono font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                          >
+                            <X className="w-3 h-3" /> Reset Filter
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 4 Mistake Archetype Cards - Swipeable Carousel on Mobile */}
+                      <div className="flex items-center justify-between sm:hidden text-[10px] font-mono text-zinc-400 px-1 pb-1">
+                        <span>‚Üê Swipe 4 Mistake Archetypes ‚Üí</span>
+                        <span>Tap to Filter</span>
+                      </div>
+                      <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 overflow-x-auto sm:overflow-visible gap-3.5 pb-2.5 sm:pb-0 snap-x snap-mandatory scrollbar-thin">
+                        {/* 1. Conceptual Gap */}
+                        <div
+                          onClick={() => setMicroMistakeFilter(microMistakeFilter === "conceptual" ? "all" : "conceptual")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] sm:w-auto shrink-0 sm:shrink snap-center  ${
+                            microMistakeFilter === "conceptual"
+                              ? "bg-rose-50/90 border-rose-500 ring-2 ring-rose-400/40 shadow-sm"
+                              : "bg-slate-50/80 hover:bg-rose-50/40 border-zinc-200 hover:border-rose-300"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">üéØ</span>
+                                <span className="text-xs font-black text-slate-900 tracking-tight">Conceptual Gap</span>
+                              </div>
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                                {microDiagnosticsData.mistakeDistribution.conceptual.percent}% Frequency
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 leading-relaxed">
+                              Misunderstanding fundamental physics/maths laws, boundary conditions, or definitions.
+                            </p>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-zinc-200/60 space-y-1.5">
+                            <div className="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-rose-500 rounded-full"
+                                style={{ width: `${microDiagnosticsData.mistakeDistribution.conceptual.percent}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-rose-700 block truncate">
+                              üí° Remedy: Visual Blackboard Derivation
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 2. Calculation Slip */}
+                        <div
+                          onClick={() => setMicroMistakeFilter(microMistakeFilter === "calculation" ? "all" : "calculation")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] sm:w-auto shrink-0 sm:shrink snap-center  ${
+                            microMistakeFilter === "calculation"
+                              ? "bg-amber-50/90 border-amber-500 ring-2 ring-amber-400/40 shadow-sm"
+                              : "bg-slate-50/80 hover:bg-amber-50/40 border-zinc-200 hover:border-amber-300"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">üßÆ</span>
+                                <span className="text-xs font-black text-slate-900 tracking-tight">Calculation Slip</span>
+                              </div>
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                {microDiagnosticsData.mistakeDistribution.calculation.percent}% Frequency
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 leading-relaxed">
+                              Algebraic sign errors (+/-), incorrect transpositions, arithmetic slips during steps.
+                            </p>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-zinc-200/60 space-y-1.5">
+                            <div className="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-amber-500 rounded-full"
+                                style={{ width: `${microDiagnosticsData.mistakeDistribution.calculation.percent}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-amber-700 block truncate">
+                              üí° Remedy: Step-by-Step Checking & Alignment
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 3. Formula Misrecall */}
+                        <div
+                          onClick={() => setMicroMistakeFilter(microMistakeFilter === "formula" ? "all" : "formula")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] sm:w-auto shrink-0 sm:shrink snap-center  ${
+                            microMistakeFilter === "formula"
+                              ? "bg-purple-50/90 border-purple-500 ring-2 ring-purple-400/40 shadow-sm"
+                              : "bg-slate-50/80 hover:bg-purple-50/40 border-zinc-200 hover:border-purple-300"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">‚ö°</span>
+                                <span className="text-xs font-black text-slate-900 tracking-tight">Formula Misrecall</span>
+                              </div>
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                {microDiagnosticsData.mistakeDistribution.formula.percent}% Frequency
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 leading-relaxed">
+                              Applying the wrong identity, forgetting powers/constants, or unit conversion mismatch.
+                            </p>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-zinc-200/60 space-y-1.5">
+                            <div className="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-purple-500 rounded-full"
+                                style={{ width: `${microDiagnosticsData.mistakeDistribution.formula.percent}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-purple-700 block truncate">
+                              üí° Remedy: KaTeX Flashcards & Dimensions
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 4. Speed / Panic Trap */}
+                        <div
+                          onClick={() => setMicroMistakeFilter(microMistakeFilter === "speed" ? "all" : "speed")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] sm:w-auto shrink-0 sm:shrink snap-center  ${
+                            microMistakeFilter === "speed"
+                              ? "bg-sky-50/90 border-sky-500 ring-2 ring-sky-400/40 shadow-sm"
+                              : "bg-slate-50/80 hover:bg-sky-50/40 border-zinc-200 hover:border-sky-300"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">‚è±Ô∏è</span>
+                                <span className="text-xs font-black text-slate-900 tracking-tight">Speed / Panic Trap</span>
+                              </div>
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
+                                {microDiagnosticsData.mistakeDistribution.speed.percent}% Frequency
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 leading-relaxed">
+                              Rushed answering under 15s or getting bogged down over 120s losing exam composure.
+                            </p>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-zinc-200/60 space-y-1.5">
+                            <div className="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-sky-500 rounded-full"
+                                style={{ width: `${microDiagnosticsData.mistakeDistribution.speed.percent}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-sky-700 block truncate">
+                              üí° Remedy: 45s Timed Sprints & Elimination
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: GRANULAR SUB-TOPIC MASTERY & DIRECT ACTION HUB */}
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-5 text-left">
+                      
+                      {/* Filter Bar with Mobile Carousel/Grid Mode Toggle */}
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-zinc-150">
+                        <div className="flex items-center justify-between w-full lg:w-auto">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/60 shrink-0">
+                              <Crosshair className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641]">
+                                Granular Sub-Topic Competency Tree ({microDiagnosticsData.subtopics.length})
+                              </h4>
+                              <span className="text-[10px] text-zinc-400 font-mono hidden sm:inline">
+                                Click "Fix with Cherry Ma'am" to load targeted problem on blackboard
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* View Mode Toggle for Sub-Topics */}
+                          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-zinc-200 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setMicroViewMode("carousel")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                                microViewMode === "carousel"
+                                  ? "bg-[#0a3641] text-white shadow-2xs"
+                                  : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                              title="Horizontal Swipe Deck"
+                            >
+                              üé¥ Swipe Deck
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMicroViewMode("list")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                                microViewMode === "list"
+                                  ? "bg-[#0a3641] text-white shadow-2xs"
+                                  : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                              title="Grid List"
+                            >
+                              üìã Grid
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="relative w-full lg:w-72">
+                          <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Search subtopic or chapter..."
+                            value={microSearchQuery}
+                            onChange={(e) => setMicroSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-700 focus:border-teal-700 font-medium"
+                          />
+                          {microSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setMicroSearchQuery("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Subject & Mastery Filter Pills */}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        {/* Subject Filter Pills */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                          {["all", "Mathematics", "Physics", "Chemistry", "Biology"].map((subj) => (
+                            <button
+                              key={subj}
+                              type="button"
+                              onClick={() => setMicroSubjectFilter(subj)}
+                              className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0 border ${
+                                microSubjectFilter === subj
+                                  ? "bg-[#0a3641] text-white border-[#0a3641] shadow-2xs font-black"
+                                  : "bg-slate-50 text-zinc-600 border-zinc-200 hover:bg-slate-100 hover:text-zinc-900"
+                              }`}
+                            >
+                              {subj === "all" ? "üåê All Subjects" : subj}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Mastery Status Filter Pills */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                          {[
+                            { key: "all", label: "All Status", count: microDiagnosticsData.allSubtopics.length },
+                            { key: "critical", label: "üî¥ Critical (<60%)", count: microDiagnosticsData.criticalGapsCount },
+                            { key: "practicing", label: "üü° In Progress (60-84%)", count: microDiagnosticsData.practicingCount },
+                            { key: "mastered", label: "üü¢ Mastered (85%+)", count: microDiagnosticsData.masteredCount },
+                          ].map((tab) => (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              onClick={() => setMicroMasteryFilter(tab.key as any)}
+                              className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0 border ${
+                                microMasteryFilter === tab.key
+                                  ? "bg-teal-900 text-[#c4f500] border-teal-900 shadow-2xs font-black"
+                                  : "bg-white text-zinc-600 border-zinc-200 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span>{tab.label}</span>
+                              <span className="ml-1 text-[9px] opacity-80">({tab.count})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Sub-Topics List Cards (Horizontal Carousel or Grid) */}
+                      {microDiagnosticsData.subtopics.length > 0 ? (
+                        <>
+                          {microViewMode === "carousel" && (
+                            <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-1 pb-1">
+                              <span>‚Üê Swipe Subtopics Horizontal Deck ({microDiagnosticsData.subtopics.length} total) ‚Üí</span>
+                              <span>Touch & Drag</span>
+                            </div>
+                          )}
+                          <div className={
+                            microViewMode === "carousel"
+                              ? "flex overflow-x-auto gap-4 pb-3 pt-1 snap-x snap-mandatory scrollbar-thin"
+                              : "grid grid-cols-1 md:grid-cols-2 gap-4"
+                          }>
+                          {microDiagnosticsData.subtopics.map((sub) => {
+                            const isCritical = sub.masteryStatus === "critical";
+                            const isMastered = sub.masteryStatus === "mastered";
+
+                            return (
+                              <div
+                                key={sub.id}
+                                className={`rounded-2xl border p-4.5 transition-all flex flex-col justify-between space-y-3.5 relative overflow-hidden ${
+                                  microViewMode === "carousel" ? "w-[86vw] sm:w-[380px] shrink-0 snap-center shadow-xs" : ""
+                                } ${
+                                  isCritical
+                                    ? "bg-gradient-to-br from-white via-rose-50/20 to-rose-50/40 border-rose-200/90 shadow-2xs hover:border-rose-300"
+                                    : isMastered
+                                    ? "bg-gradient-to-br from-white via-emerald-50/20 to-emerald-50/40 border-emerald-200/90 shadow-2xs hover:border-emerald-300"
+                                    : "bg-white border-zinc-200 shadow-2xs hover:border-zinc-300"
+                                }`}
+                              >
+                                {/* Header: Subject badge & Title */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-slate-100 text-zinc-700 px-2 py-0.5 rounded-md border border-zinc-200">
+                                        {sub.subject}
+                                      </span>
+                                      <span className="text-[9px] font-mono text-zinc-400 font-bold">
+                                        ‚Ä¢ {sub.chapter}
+                                      </span>
+                                    </div>
+
+                                    {/* Mastery Status Badge */}
+                                    <span
+                                      className={`text-[9.5px] font-mono font-black px-2 py-0.5 rounded-lg border ${
+                                        isCritical
+                                          ? "bg-rose-100 text-rose-800 border-rose-200"
+                                          : isMastered
+                                          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                          : "bg-amber-100 text-amber-800 border-amber-200"
+                                      }`}
+                                    >
+                                      {sub.masteryScore}% {isCritical ? "‚Ä¢ Critical Gap" : isMastered ? "‚Ä¢ Mastered" : "‚Ä¢ In Progress"}
+                                    </span>
+                                  </div>
+
+                                  <h5 className="text-xs sm:text-sm font-black text-[#0a3641] tracking-tight leading-snug">
+                                    {sub.name}
+                                  </h5>
+                                </div>
+
+                                {/* Metrics bar: Accuracy & Latency */}
+                                <div className="grid grid-cols-2 gap-2 bg-slate-50/80 p-2.5 rounded-xl border border-zinc-150">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-[9px] font-mono text-zinc-500 font-bold">
+                                      <span>Accuracy</span>
+                                      <span className="text-[#0a3641] font-black">{sub.accuracy}%</span>
+                                    </div>
+                                    <div className="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          isCritical ? "bg-rose-500" : isMastered ? "bg-emerald-500" : "bg-amber-500"
+                                        }`}
+                                        style={{ width: `${sub.accuracy}%` }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-1 border-l border-zinc-200 pl-2.5">
+                                    <div className="flex items-center justify-between text-[9px] font-mono text-zinc-500 font-bold">
+                                      <span>Speed Latency</span>
+                                      <span className="text-teal-900 font-black">{sub.avgLatencySec}s</span>
+                                    </div>
+                                    <div className="text-[8.5px] font-mono text-zinc-500 flex items-center gap-1">
+                                      <span>Target: {sub.benchmarkLatencySec}s</span>
+                                      {sub.avgLatencySec <= sub.benchmarkLatencySec ? (
+                                        <span className="text-emerald-600 font-bold">‚ö° Optimal</span>
+                                      ) : (
+                                        <span className="text-amber-600 font-bold">‚è≥ Hesitant</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* KaTeX Key Formulas / Rules */}
+                                {sub.keyFormulas && sub.keyFormulas.length > 0 && (
+                                  <div className="bg-slate-900 text-teal-200 p-2.5 rounded-xl border border-slate-800 text-[10px] font-mono overflow-x-auto">
+                                    <div className="text-[8px] font-mono text-teal-400/80 uppercase tracking-widest mb-1">
+                                      üìå Key Formula / Governing Rule
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {sub.keyFormulas.slice(0, 2).map((formula, fIdx) => (
+                                        <span
+                                          key={fIdx}
+                                          dangerouslySetInnerHTML={{
+                                            __html: katex.renderToString(formula, { throwOnError: false })
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Socratic Prescription Tip */}
+                                <div className="text-[10px] text-zinc-600 leading-relaxed bg-amber-50/50 p-2 rounded-xl border border-amber-150/70 flex items-start gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                  <p>
+                                    <strong className="text-slate-800 font-bold">Cherry's Micro-Tip:</strong> {sub.prescriptionHint}
+                                  </p>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-150">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedDrillSubtopic(sub)}
+                                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[10px] font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <Search className="w-3 h-3 text-slate-600" />
+                                    <span>Questions (Drill)</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (onDiscussWithCherry) {
+                                        onDiscussWithCherry({
+                                          topic: sub.name,
+                                          subject: sub.subject,
+                                          conceptTested: sub.name,
+                                          hint: sub.prescriptionHint,
+                                          question: `Cherry Ma'am, please explain ${sub.name} step-by-step on the blackboard with a targeted problem to fix my calculation accuracy.`
+                                        });
+                                      } else if (onEnterClassroom) {
+                                        onEnterClassroom();
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-teal-800 to-[#0a3641] hover:from-teal-700 hover:to-[#082d36] text-[#c4f500] text-[10px] font-black uppercase tracking-wider font-mono transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                                  >
+                                    <Zap className="w-3 h-3 text-[#c4f500]" />
+                                    <span>Fix with Cherry Ma'am</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        </>
+                      ) : (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-zinc-200 space-y-2">
+                          <p className="text-xs text-zinc-500 font-medium">
+                            No sub-topics found matching your search or filters.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMicroSubjectFilter("all");
+                              setMicroMasteryFilter("all");
+                              setMicroMistakeFilter("all");
+                              setMicroSearchQuery("");
+                            }}
+                            className="text-[10px] font-mono font-bold text-teal-800 underline cursor-pointer"
+                          >
+                            Reset All Filters
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Question Drilldown Modal */}
+                    {selectedDrillSubtopic && (
+                      <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fade-in">
+                        <div className="bg-white border border-zinc-200 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-left">
+                          
+                          {/* Modal Header */}
+                          <div className="px-5 py-4 bg-gradient-to-r from-[#0a3641] to-[#041a1e] text-white flex items-center justify-between shrink-0">
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-[#c4f500]/20 text-[#c4f500] px-2 py-0.5 rounded-md">
+                                  {selectedDrillSubtopic.subject} ‚Ä¢ {selectedDrillSubtopic.chapter}
+                                </span>
+                                <span className="text-[9px] font-mono text-teal-200">
+                                  Mastery: <strong>{selectedDrillSubtopic.masteryScore}%</strong>
+                                </span>
+                              </div>
+                              <h3 className="text-sm sm:text-base font-black text-white truncate">
+                                {selectedDrillSubtopic.name} ‚Ä¢ Question Diagnostics
+                              </h3>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDrillSubtopic(null)}
+                              className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors cursor-pointer"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          {/* Modal Body */}
+                          <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                            {/* Prescription Banner */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900 leading-relaxed flex items-start gap-2.5">
+                              <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <strong className="font-black">Target Socratic Strategy:</strong> {selectedDrillSubtopic.prescriptionHint}
+                              </div>
+                            </div>
+
+                            {/* Question Logs */}
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-zinc-500 font-mono">
+                                üìù Diagnostic Problem History ({selectedDrillSubtopic.recentQuestions?.length || 0})
+                              </h4>
+
+                              {selectedDrillSubtopic.recentQuestions?.map((q: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                                    q.isCorrect
+                                      ? "bg-emerald-50/30 border-emerald-200"
+                                      : "bg-rose-50/30 border-rose-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-mono font-bold text-zinc-500">
+                                      Problem #{idx + 1}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[9px] font-mono text-zinc-500">
+                                        ‚è±Ô∏è {q.latencySec}s
+                                      </span>
+                                      <span
+                                        className={`text-[9px] font-mono font-black px-2 py-0.5 rounded-md border ${
+                                          q.isCorrect
+                                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                            : "bg-rose-100 text-rose-800 border-rose-300"
+                                        }`}
+                                      >
+                                        {q.isCorrect ? "‚úÖ Solved Correctly" : `‚ö†Ô∏è ${q.mistakeType || "Review"} Error`}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <p className="text-xs font-bold text-slate-900 leading-snug">
+                                    {q.question}
+                                  </p>
+
+                                  <div className="bg-white p-2.5 rounded-xl border border-zinc-150 text-[10.5px] space-y-1">
+                                    <div className="text-zinc-600">
+                                      <strong className="text-slate-800">Your Submitted Step:</strong> {q.userAnswer}
+                                    </div>
+                                    <div className="text-emerald-800">
+                                      <strong className="text-emerald-950">Standard Derivation:</strong> {q.explanation}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Modal Footer */}
+                          <div className="px-5 py-3 bg-slate-50 border-t border-zinc-200 flex items-center justify-between shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDrillSubtopic(null)}
+                              className="px-4 py-2 rounded-xl text-xs font-mono font-bold text-zinc-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                            >
+                              Close Drilldown
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sub = selectedDrillSubtopic;
+                                setSelectedDrillSubtopic(null);
+                                if (onDiscussWithCherry) {
+                                  onDiscussWithCherry({
+                                    topic: sub.name,
+                                    subject: sub.subject,
+                                    conceptTested: sub.name,
+                                    hint: sub.prescriptionHint,
+                                    question: `Cherry Ma'am, please explain ${sub.name} step-by-step on the blackboard with a targeted problem to fix my calculation accuracy.`
+                                  });
+                                } else if (onEnterClassroom) {
+                                  onEnterClassroom();
+                                }
+                              }}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-800 to-[#0a3641] hover:from-teal-700 text-[#c4f500] text-xs font-black uppercase font-mono tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <Zap className="w-3.5 h-3.5 text-[#c4f500]" />
+                              <span>Practice on Blackboard with Cherry Ma'am üöÄ</span>
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                ) : performanceWorkspaceTab === "retention" ? (
+                  /* PHASE 2: COGNITIVE RETENTION & EBBINGHAUS SPACED REPETITION VIEW */
+                  <div className="space-y-6 animate-fade-in text-left">
+                    
+                    {/* Hero Header for Retention */}
+                    <div className="bg-gradient-to-br from-[#062026] via-[#0a3641] to-[#041a1e] border border-teal-500/30 rounded-3xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-amber-400/10 rounded-full opacity-30 pointer-events-none" />
+                      <div className="space-y-1.5 min-w-0 z-10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-amber-400/20 text-amber-300 font-mono px-2.5 py-0.5 rounded-full font-black border border-amber-400/30 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                            Ebbinghaus Forgetting Curve Engine
+                          </span>
+                          <span className="text-[10px] font-mono text-amber-200/80">
+                            Neural Memory Decay Tracker
+                          </span>
+                        </div>
+                        <h3 className="text-sm sm:text-base md:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                          <span>Memory Decay & Spaced Repetition Radar</span>
+                        </h3>
+                        <p className="text-xs text-amber-100/85 font-sans leading-relaxed max-w-2xl">
+                          Scientifically schedules chalkboard flashcard reviews at Day 1, 3, 7, 14, and 30 intervals to reset memory decay back to 100%.
+                        </p>
+                      </div>
+
+                      {/* Summary Badges Bento */}
+                      <div className="flex sm:grid sm:grid-cols-4 overflow-x-auto sm:overflow-visible gap-2 w-full md:w-auto shrink-0 z-10 pb-1 sm:pb-0 scrollbar-none snap-x">
+                        <div className="bg-white/10 border border-white/10 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-200 block">Avg Memory</span>
+                          <span className="text-base sm:text-lg font-black text-white font-mono">{retentionEngineData.avgRetention}%</span>
+                          <span className="text-[8.5px] text-amber-300/80 block">Retention</span>
+                        </div>
+                        <div className="bg-rose-500/20 border border-rose-400/30 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-rose-300 block">Due Now</span>
+                          <span className="text-base sm:text-lg font-black text-rose-300 font-mono">{retentionEngineData.criticalCount}</span>
+                          <span className="text-[8.5px] text-rose-200/80 block">&lt;50% Decay</span>
+                        </div>
+                        <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-300 block">Review Soon</span>
+                          <span className="text-base sm:text-lg font-black text-amber-300 font-mono">{retentionEngineData.warningCount}</span>
+                          <span className="text-[8.5px] text-amber-200/80 block">50‚Äì72%</span>
+                        </div>
+                        <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-300 block">Optimal</span>
+                          <span className="text-base sm:text-lg font-black text-emerald-300 font-mono">{retentionEngineData.stableCount}</span>
+                          <span className="text-[8.5px] text-emerald-200/80 block">Long-term</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 1: INTERACTIVE EBBINGHAUS RETENTION CURVE VISUALIZER */}
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-150 gap-2">
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641] flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/60">
+                              <Activity className="w-4 h-4 text-amber-600" />
+                            </span>
+                            <span>The Science of Spaced Repetition (R = e^(-t/S) Curve)</span>
+                          </h4>
+                          <p className="text-[11px] text-zinc-500 font-medium mt-0.5">
+                            Without review, up to 70% of lecture concepts decay within 7 days. Each spaced recall session flattens the decay curve.
+                          </p>
+                        </div>
+                        <span className="text-[9.5px] font-mono font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shrink-0">
+                          üß† Leitner Box Active
+                        </span>
+                      </div>
+
+                      {/* SVG Interactive Forgetting Curve Comparison Graphic */}
+                      <div className="bg-slate-900 rounded-2xl p-4 sm:p-6 text-white relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-3 text-xs font-mono">
+                          <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-rose-500" /> Single Lecture (Fast Decay)
+                          </span>
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400" /> Spaced Repetition (Reinforced Memory)
+                          </span>
+                        </div>
+
+                        {/* Responsive SVG Chart */}
+                        <div className="w-full h-44 sm:h-52 relative">
+                          <svg className="w-full h-full overflow-visible" viewBox="0 0 500 160" preserveAspectRatio="none">
+                            {/* Grid Lines */}
+                            <line x1="40" y1="20" x2="480" y2="20" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" />
+                            <line x1="40" y1="55" x2="480" y2="55" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" />
+                            <line x1="40" y1="90" x2="480" y2="90" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" />
+                            <line x1="40" y1="125" x2="480" y2="125" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" />
+                            
+                            {/* Y Axis Labels */}
+                            <text x="5" y="24" fill="#94a3b8" fontSize="8" fontFamily="monospace">100%</text>
+                            <text x="12" y="59" fill="#94a3b8" fontSize="8" fontFamily="monospace">75%</text>
+                            <text x="12" y="94" fill="#94a3b8" fontSize="8" fontFamily="monospace">50%</text>
+                            <text x="12" y="129" fill="#94a3b8" fontSize="8" fontFamily="monospace">25%</text>
+
+                            {/* X Axis Labels */}
+                            <text x="40" y="152" fill="#94a3b8" fontSize="8" fontFamily="monospace">Day 0</text>
+                            <text x="110" y="152" fill="#94a3b8" fontSize="8" fontFamily="monospace">Day 1</text>
+                            <text x="190" y="152" fill="#94a3b8" fontSize="8" fontFamily="monospace">Day 3</text>
+                            <text x="270" y="152" fill="#94a3b8" fontSize="8" fontFamily="monospace">Day 7</text>
+                            <text x="360" y="152" fill="#94a3b8" fontSize="8" fontFamily="monospace">Day 14</text>
+                            <text x="450" y="152" fill="#94a3b8" fontSize="8" fontFamily="monospace">Day 30</text>
+
+                            {/* Curve 1: Rapid Decay without review (Rose) */}
+                            <path
+                              d="M 40 20 Q 120 100 270 120 T 480 135"
+                              fill="none"
+                              stroke="#f43f5e"
+                              strokeWidth="3"
+                              strokeDasharray="4 2"
+                            />
+
+                            {/* Curve 2: Spaced Repetition (Reinforced Peaks - Emerald) */}
+                            {/* Peak 1: Day 1 Review */}
+                            <path
+                              d="M 40 20 Q 80 50 110 65 L 110 20 Q 150 45 190 55 L 190 20 Q 230 35 270 42 L 270 20 Q 320 30 360 35 L 360 20 Q 420 25 480 28"
+                              fill="none"
+                              stroke="#34d399"
+                              strokeWidth="3"
+                            />
+
+                            {/* Key Review Nodes with Pulsing Glow */}
+                            <circle cx="110" cy="20" r="4" fill="#34d399" />
+                            <circle cx="190" cy="20" r="4" fill="#34d399" />
+                            <circle cx="270" cy="20" r="4" fill="#34d399" />
+                            <circle cx="360" cy="20" r="4" fill="#34d399" />
+                            
+                            {/* Annotations */}
+                            <text x="115" y="14" fill="#c4f500" fontSize="7.5" fontWeight="bold" fontFamily="monospace">1st Review</text>
+                            <text x="195" y="14" fill="#c4f500" fontSize="7.5" fontWeight="bold" fontFamily="monospace">2nd</text>
+                            <text x="275" y="14" fill="#c4f500" fontSize="7.5" fontWeight="bold" fontFamily="monospace">3rd</text>
+                            <text x="365" y="14" fill="#c4f500" fontSize="7.5" fontWeight="bold" fontFamily="monospace">4th (Mastered)</text>
+                          </svg>
+                        </div>
+
+                        <div className="mt-2 text-[10px] text-slate-300/90 font-mono flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-2">
+                          <span>üí° Current Retention Health: <strong className="text-[#c4f500]">{retentionEngineData.avgRetention}%</strong> Across All Subjects</span>
+                          <span className="text-teal-300">Next Recommended Sprint: <strong>{retentionEngineData.criticalCount} Topics Due Today</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: TOPICS DECAY RADAR & REVISION SCHEDULER */}
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-5 text-left">
+                      
+                      {/* Filter Bar with Mobile Carousel/Grid Mode Toggle */}
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-zinc-150">
+                        <div className="flex items-center justify-between w-full lg:w-auto">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/60 shrink-0">
+                              <Hourglass className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641]">
+                                Spaced Repetition Review Queue ({retentionEngineData.items.length})
+                              </h4>
+                              <span className="text-[10px] text-zinc-400 font-mono hidden sm:inline">
+                                Reinforce key formulas & definitions on chalkboard before memory fades
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* View Mode Toggle */}
+                          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-zinc-200 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setRetentionViewMode("carousel")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                                retentionViewMode === "carousel"
+                                  ? "bg-[#0a3641] text-white shadow-2xs"
+                                  : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                              title="Horizontal Swipe Deck"
+                            >
+                              üé¥ Swipe Deck
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRetentionViewMode("list")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                                retentionViewMode === "list"
+                                  ? "bg-[#0a3641] text-white shadow-2xs"
+                                  : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                              title="Grid List"
+                            >
+                              üìã Grid
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Subject Filter Pills */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                          {["all", "Mathematics", "Physics", "Chemistry", "Biology"].map((subj) => (
+                            <button
+                              key={subj}
+                              type="button"
+                              onClick={() => setRetentionActiveSubject(subj)}
+                              className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0 border ${
+                                retentionActiveSubject === subj
+                                  ? "bg-[#0a3641] text-white border-[#0a3641] shadow-2xs font-black"
+                                  : "bg-slate-50 text-zinc-600 border-zinc-200 hover:bg-slate-100 hover:text-zinc-900"
+                              }`}
+                            >
+                              {subj === "all" ? "üåê All Subjects" : subj}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Urgency Filter Tabs */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {[
+                          { key: "all", label: "All Topics", count: retentionEngineData.allItems.length },
+                          { key: "critical", label: "üî¥ Immediate Due (<50%)", count: retentionEngineData.criticalCount },
+                          { key: "warning", label: "üü° Review Soon (50-72%)", count: retentionEngineData.warningCount },
+                          { key: "stable", label: "üü¢ Long-Term Stable (73%+)", count: retentionEngineData.stableCount },
+                        ].map((tab) => (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setRetentionFilterUrgency(tab.key as any)}
+                            className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0 border ${
+                              retentionFilterUrgency === tab.key
+                                ? "bg-amber-800 text-[#c4f500] border-amber-800 shadow-2xs font-black"
+                                : "bg-white text-zinc-600 border-zinc-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span>{tab.label}</span>
+                            <span className="ml-1 text-[9px] opacity-80">({tab.count})</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Repetition Queue Cards (Swipe Deck vs Grid) */}
+                      {retentionEngineData.items.length > 0 ? (
+                        <>
+                          {retentionViewMode === "carousel" && (
+                            <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-1 pb-1">
+                              <span>‚Üê Swipe Repetition Cards ({retentionEngineData.items.length} in queue) ‚Üí</span>
+                              <span>Touch & Drag</span>
+                            </div>
+                          )}
+                          <div className={
+                            retentionViewMode === "carousel"
+                              ? "flex overflow-x-auto gap-4 pb-3 pt-1 snap-x snap-mandatory scrollbar-thin"
+                              : "grid grid-cols-1 md:grid-cols-2 gap-4"
+                          }>
+                          {retentionEngineData.items.map((item) => {
+                            const isCritical = item.urgency === "critical";
+                            const isStable = item.urgency === "stable";
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`rounded-2xl border p-4.5 transition-all flex flex-col justify-between space-y-3.5 relative overflow-hidden ${
+                                  retentionViewMode === "carousel" ? "w-[86vw] sm:w-[380px] shrink-0 snap-center shadow-xs" : ""
+                                } ${
+                                  isCritical
+                                    ? "bg-gradient-to-br from-white via-rose-50/20 to-rose-50/40 border-rose-200/90 shadow-2xs hover:border-rose-300"
+                                    : isStable
+                                    ? "bg-gradient-to-br from-white via-emerald-50/20 to-emerald-50/40 border-emerald-200/90 shadow-2xs hover:border-emerald-300"
+                                    : "bg-white border-amber-200/80 shadow-2xs hover:border-amber-300"
+                                }`}
+                              >
+                                {/* Header */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-slate-100 text-zinc-700 px-2 py-0.5 rounded-md border border-zinc-200">
+                                        {item.subject}
+                                      </span>
+                                      <span className="text-[9px] font-mono text-zinc-400 font-bold">
+                                        ‚Ä¢ {item.chapter}
+                                      </span>
+                                    </div>
+
+                                    {/* Urgency Badge */}
+                                    <span className={`text-[9.5px] font-mono font-black px-2.5 py-0.5 rounded-lg border ${item.urgencyColor}`}>
+                                      {item.urgencyLabel}
+                                    </span>
+                                  </div>
+
+                                  <h5 className="text-xs sm:text-sm font-black text-[#0a3641] tracking-tight leading-snug">
+                                    {item.topicName}
+                                  </h5>
+                                </div>
+
+                                {/* Retention Meter & Spaced Intervals */}
+                                <div className="bg-slate-50/80 p-3 rounded-xl border border-zinc-150 space-y-2">
+                                  <div className="flex items-center justify-between text-[9.5px] font-mono">
+                                    <span className="text-zinc-500 font-bold">Estimated Memory Strength:</span>
+                                    <strong className={`font-black ${isCritical ? "text-rose-600" : isStable ? "text-emerald-700" : "text-amber-600"}`}>
+                                      {item.currentRetention}% Retention
+                                    </strong>
+                                  </div>
+
+                                  <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all ${
+                                        isCritical ? "bg-rose-500" : isStable ? "bg-emerald-500" : "bg-amber-500"
+                                      }`}
+                                      style={{ width: `${item.currentRetention}%` }}
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-[8.5px] font-mono text-zinc-500 pt-1 border-t border-zinc-200/60">
+                                    <span>Studied: <strong>{item.lastStudiedDaysAgo} days ago</strong></span>
+                                    <span>Repetitions: <strong>{item.repetitionCount} / 5</strong></span>
+                                    <span>Interval: <strong>Day {item.nextReviewDays}</strong></span>
+                                  </div>
+                                </div>
+
+                                {/* KaTeX Formula preview if available */}
+                                {item.formulaKatex && (
+                                  <div className="bg-slate-900 text-amber-200 p-2.5 rounded-xl border border-slate-800 text-[10px] font-mono overflow-x-auto">
+                                    <div className="text-[8px] font-mono text-amber-400/80 uppercase tracking-widest mb-1">
+                                      ‚ö° Core Retention Formula
+                                    </div>
+                                    <span
+                                      dangerouslySetInnerHTML={{
+                                        __html: renderKaTeXHtmlSafe(item.formulaKatex)
+                                      }}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Key Points Checklist */}
+                                <div className="space-y-1 bg-amber-50/40 p-2.5 rounded-xl border border-amber-100 text-[9.5px] text-zinc-700">
+                                  <span className="text-[8px] font-mono font-bold text-amber-900 uppercase tracking-wider block">
+                                    üìå Core Memory Anchors:
+                                  </span>
+                                  {item.keyPoints.slice(0, 2).map((kp, kpIdx) => (
+                                    <div key={kpIdx} className="flex items-start gap-1.5">
+                                      <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                                      <span>{kp}</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-150">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveFlashcardFlipped(false);
+                                      setSelectedRetentionFlashcard(item);
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <Brain className="w-3 h-3 text-amber-700" />
+                                    <span>Chalkboard Flashcard</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (onDiscussWithCherry) {
+                                        onDiscussWithCherry({
+                                          topic: item.topicName,
+                                          subject: item.subject,
+                                          conceptTested: item.topicName,
+                                          hint: item.flashcardAnswer,
+                                          question: `Cherry Ma'am, please give me a quick 3-minute spaced-repetition memory booster on ${item.topicName} on the blackboard!`
+                                        });
+                                      } else if (onEnterClassroom) {
+                                        onEnterClassroom();
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-800 to-[#0a3641] hover:from-amber-700 hover:to-[#082d36] text-[#c4f500] text-[10px] font-black uppercase tracking-wider font-mono transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                                  >
+                                    <Sparkles className="w-3 h-3 text-[#c4f500]" />
+                                    <span>Reset Decay (Recap)</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        </>
+                      ) : (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-zinc-200 space-y-2">
+                          <p className="text-xs text-zinc-500 font-medium">
+                            No review topics found for this filter.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRetentionActiveSubject("all");
+                              setRetentionFilterUrgency("all");
+                            }}
+                            className="text-[10px] font-mono font-bold text-amber-800 underline cursor-pointer"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Interactive Chalkboard Flashcard Modal */}
+                    {selectedRetentionFlashcard && (
+                      <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fade-in">
+                        <div className="bg-[#051e24] border border-teal-500/30 rounded-3xl max-w-xl w-full flex flex-col shadow-2xl overflow-hidden text-left text-white">
+                          
+                          {/* Modal Header */}
+                          <div className="px-5 py-4 bg-[#031519] border-b border-teal-900 flex items-center justify-between shrink-0">
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-md">
+                                  {selectedRetentionFlashcard.subject} ‚Ä¢ Flashcard
+                                </span>
+                                <span className="text-[9px] font-mono text-teal-300">
+                                  Retention: <strong>{selectedRetentionFlashcard.currentRetention}%</strong>
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-black text-white truncate">
+                                {selectedRetentionFlashcard.topicName}
+                              </h3>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRetentionFlashcard(null)}
+                              className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors cursor-pointer"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          {/* Flashcard Body */}
+                          <div className="p-6 flex flex-col items-center justify-center min-h-[220px] text-center space-y-4">
+                            <div
+                              onClick={() => setActiveFlashcardFlipped(!activeFlashcardFlipped)}
+                              className="w-full bg-[#082a32] border border-teal-500/40 hover:border-amber-400/60 rounded-2xl p-6 transition-all cursor-pointer shadow-lg space-y-3 relative group"
+                            >
+                              <div className="text-[9px] font-mono text-amber-400 uppercase tracking-widest flex items-center justify-center gap-1.5">
+                                <RotateCw className="w-3 h-3 animate-spin-slow" />
+                                <span>{activeFlashcardFlipped ? "Answer / Derivation (Click to flip back)" : "Prompt (Click card to reveal solution)"}</span>
+                              </div>
+
+                              {!activeFlashcardFlipped ? (
+                                <p className="text-base sm:text-lg font-bold text-white leading-relaxed">
+                                  {selectedRetentionFlashcard.flashcardPrompt}
+                                </p>
+                              ) : (
+                                <div className="space-y-3 animate-fade-in text-left">
+                                  <p className="text-sm sm:text-base text-teal-100 font-medium leading-relaxed">
+                                    {selectedRetentionFlashcard.flashcardAnswer}
+                                  </p>
+                                  {selectedRetentionFlashcard.formulaKatex && (
+                                    <div className="p-3 bg-slate-950 rounded-xl border border-teal-900 text-center">
+                                      <span
+                                        dangerouslySetInnerHTML={{
+                                          __html: renderKaTeXHtmlSafe(selectedRetentionFlashcard.formulaKatex)
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="text-[8.5px] font-mono text-teal-400/70 pt-2">
+                                üí° Tip: Active recall strengthens neural pathways 3x faster than passive reading.
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Modal Footer */}
+                          <div className="px-5 py-3 bg-[#031519] border-t border-teal-900 flex items-center justify-between shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRetentionFlashcard(null)}
+                              className="px-4 py-2 rounded-xl text-xs font-mono font-bold text-teal-300 hover:bg-white/5 transition-colors cursor-pointer"
+                            >
+                              Close
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const card = selectedRetentionFlashcard;
+                                setSelectedRetentionFlashcard(null);
+                                if (onDiscussWithCherry) {
+                                  onDiscussWithCherry({
+                                    topic: card.topicName,
+                                    subject: card.subject,
+                                    conceptTested: card.topicName,
+                                    hint: card.flashcardAnswer,
+                                    question: `Cherry Ma'am, please explain ${card.topicName} on the chalkboard with an intuitive example so I retain it long-term.`
+                                  });
+                                } else if (onEnterClassroom) {
+                                  onEnterClassroom();
+                                }
+                              }}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-teal-700 hover:from-amber-500 text-white text-xs font-black uppercase font-mono tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                              <span>Practice on Blackboard with Cherry Ma'am üöÄ</span>
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                ) : performanceWorkspaceTab === "agility" ? (
+                  /* PHASE 3: COGNITIVE AGILITY, SPEED-ACCURACY QUADRANT & PREDICTIVE EXAM READINESS VIEW */
+                  <div className="space-y-6 animate-fade-in text-left">
+                    
+                    {/* Hero Header for Agility & Stamina */}
+                    <div className="bg-gradient-to-br from-[#062026] via-[#0a3641] to-[#041a1e] border border-teal-500/30 rounded-3xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="absolute top-0 right-0 w-72 h-72 bg-indigo-500/10 rounded-full opacity-30 pointer-events-none" />
+                      
+                      <div className="space-y-1.5 min-w-0 z-10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-indigo-400/20 text-indigo-300 font-mono px-2.5 py-0.5 rounded-full font-black border border-indigo-400/30 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+                            Speed-Accuracy & Cognitive Stamina Engine
+                          </span>
+                          <span className="text-[10px] font-mono text-indigo-200/80">
+                            Time-Under-Pressure Analytics
+                          </span>
+                        </div>
+                        <h3 className="text-sm sm:text-base md:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                          <span>Socratic Agility, Fatigue Curve & Exam Readiness</span>
+                        </h3>
+                        <p className="text-xs text-indigo-100/85 font-sans leading-relaxed max-w-2xl">
+                          Surgically correlates response latency against conceptual precision to eliminate test anxiety, over-calculation, and cognitive fatigue.
+                        </p>
+                      </div>
+
+                      {/* Summary Badges Bento */}
+                      <div className="flex sm:grid sm:grid-cols-4 overflow-x-auto sm:overflow-visible gap-2 w-full md:w-auto shrink-0 z-10 pb-1 sm:pb-0 scrollbar-none snap-x">
+                        <div className="bg-white/10 border border-white/10 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-indigo-200 block">Agility Score</span>
+                          <span className="text-base sm:text-lg font-black text-white font-mono">{staminaAnalyticsData.agilityScore}/100</span>
+                          <span className="text-[8.5px] text-indigo-300/80 block">Neural Speed</span>
+                        </div>
+                        <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-300 block">Flow State</span>
+                          <span className="text-base sm:text-lg font-black text-emerald-300 font-mono">{staminaAnalyticsData.flowCount}</span>
+                          <span className="text-[8.5px] text-emerald-200/80 block">&lt;45s &amp; &gt;80%</span>
+                        </div>
+                        <div className="bg-sky-500/20 border border-sky-400/30 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-sky-300 block">Overthink</span>
+                          <span className="text-base sm:text-lg font-black text-sky-300 font-mono">{staminaAnalyticsData.overthinkCount}</span>
+                          <span className="text-[8.5px] text-sky-200/80 block">Slow &amp; Acc</span>
+                        </div>
+                        <div className="bg-rose-500/20 border border-rose-400/30 rounded-2xl p-2.5 text-center">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-rose-300 block">Projected</span>
+                          <span className="text-base sm:text-lg font-black text-rose-300 font-mono">{staminaAnalyticsData.projectedRawScore}%</span>
+                          <span className="text-[8.5px] text-rose-200/80 block">¬±{staminaAnalyticsData.confidenceMargin}% Exam Band</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 1: THE 4-QUADRANT SPEED VS ACCURACY COGNITIVE MATRIX */}
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-150 gap-2">
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641] flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200/60">
+                              <Gauge className="w-4 h-4 text-indigo-600" />
+                            </span>
+                            <span>The Cognitive Agility 4-Quadrant Matrix (Latency vs Accuracy)</span>
+                          </h4>
+                          <p className="text-[11px] text-zinc-500 font-medium mt-0.5">
+                            Real exam success requires both high accuracy and low latency. Identify where you over-calculate or rush impulsively.
+                          </p>
+                        </div>
+                        <span className="text-[9.5px] font-mono font-bold text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 shrink-0">
+                          üéØ Threshold: 45s Benchmark
+                        </span>
+                      </div>
+
+                      {/* Visual 4-Quadrant Layout - Horizontal Swipe Deck on Mobile */}
+                      <div className="flex items-center justify-between md:hidden text-[10px] font-mono text-zinc-400 px-1 pb-1">
+                        <span>‚Üê Swipe 4 Agility Quadrants ‚Üí</span>
+                        <span>Tap to Filter</span>
+                      </div>
+                      <div className="flex md:grid md:grid-cols-2 overflow-x-auto md:overflow-visible gap-4 pt-1 pb-2 md:pb-0 snap-x snap-mandatory scrollbar-thin">
+                        
+                        {/* Quadrant 1: Flow State */}
+                        <div
+                          onClick={() => setStaminaQuadrantFilter(staminaQuadrantFilter === "flow" ? "all" : "flow")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] md:w-auto shrink-0 md:shrink snap-center  ${
+                            staminaQuadrantFilter === "flow"
+                              ? "bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-400/40 shadow-sm"
+                              : "bg-gradient-to-br from-emerald-50/40 to-white hover:bg-emerald-50/70 border-emerald-200"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 rounded-lg bg-emerald-100 text-emerald-800 font-mono text-xs font-black">Q1</span>
+                                <div>
+                                  <h5 className="text-xs font-black text-emerald-950 tracking-tight">Flow State (Automaticity)</h5>
+                                  <span className="text-[9px] font-mono text-emerald-700">Fast (&lt;45s) ‚Ä¢ High Accuracy (&gt;75%)</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                {staminaAnalyticsData.flowCount} Topics
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-zinc-600 leading-relaxed">
+                              Concepts mastered to instantaneous intuition. Minimal mental friction during exam pressure.
+                            </p>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-emerald-200/60 flex items-center justify-between text-[9px] font-mono font-bold text-emerald-800">
+                            <span>‚úÖ Action: Keep Warm with Weekly Spaced Recall</span>
+                            <span>{staminaQuadrantFilter === "flow" ? "Active Filter" : "Filter Topics ‚Üí"}</span>
+                          </div>
+                        </div>
+
+                        {/* Quadrant 2: Overthink / Deep Thinker */}
+                        <div
+                          onClick={() => setStaminaQuadrantFilter(staminaQuadrantFilter === "overthink" ? "all" : "overthink")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] md:w-auto shrink-0 md:shrink snap-center  ${
+                            staminaQuadrantFilter === "overthink"
+                              ? "bg-sky-50/90 border-sky-500 ring-2 ring-sky-400/40 shadow-sm"
+                              : "bg-gradient-to-br from-sky-50/40 to-white hover:bg-sky-50/70 border-sky-200"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 rounded-lg bg-sky-100 text-sky-800 font-mono text-xs font-black">Q2</span>
+                                <div>
+                                  <h5 className="text-xs font-black text-sky-950 tracking-tight">Over-Calculation / Hesitation</h5>
+                                  <span className="text-[9px] font-mono text-sky-700">Slow (&gt;45s) ‚Ä¢ High Accuracy (&gt;75%)</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-300">
+                                {staminaAnalyticsData.overthinkCount} Topics
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-zinc-600 leading-relaxed">
+                              You know the theory, but write out unnecessary steps. Risk running out of time on long-format board papers.
+                            </p>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-sky-200/60 flex items-center justify-between text-[9px] font-mono font-bold text-sky-800">
+                            <span>‚ö° Remedy: Tabular Methods & Algebraic Shortcut Drills</span>
+                            <span>{staminaQuadrantFilter === "overthink" ? "Active Filter" : "Filter Topics ‚Üí"}</span>
+                          </div>
+                        </div>
+
+                        {/* Quadrant 3: Impulsive Rushing */}
+                        <div
+                          onClick={() => setStaminaQuadrantFilter(staminaQuadrantFilter === "rushing" ? "all" : "rushing")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] md:w-auto shrink-0 md:shrink snap-center  ${
+                            staminaQuadrantFilter === "rushing"
+                              ? "bg-amber-50/90 border-amber-500 ring-2 ring-amber-400/40 shadow-sm"
+                              : "bg-gradient-to-br from-amber-50/40 to-white hover:bg-amber-50/70 border-amber-200"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 rounded-lg bg-amber-100 text-amber-800 font-mono text-xs font-black">Q3</span>
+                                <div>
+                                  <h5 className="text-xs font-black text-amber-950 tracking-tight">Impulsive Rushing / Panic Trap</h5>
+                                  <span className="text-[9px] font-mono text-amber-700">Fast (&lt;45s) ‚Ä¢ Low Accuracy (&lt;75%)</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                                {staminaAnalyticsData.rushingCount} Topics
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-zinc-600 leading-relaxed">
+                              Answering too quickly before carefully checking boundary conditions, negative signs, or units.
+                            </p>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-amber-200/60 flex items-center justify-between text-[9px] font-mono font-bold text-amber-800">
+                            <span>üõë Remedy: Mandatory 5-Second Diagram & Sign Inspection</span>
+                            <span>{staminaQuadrantFilter === "rushing" ? "Active Filter" : "Filter Topics ‚Üí"}</span>
+                          </div>
+                        </div>
+
+                        {/* Quadrant 4: Cognitive Roadblock */}
+                        <div
+                          onClick={() => setStaminaQuadrantFilter(staminaQuadrantFilter === "roadblock" ? "all" : "roadblock")}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between w-[82vw] md:w-auto shrink-0 md:shrink snap-center  ${
+                            staminaQuadrantFilter === "roadblock"
+                              ? "bg-rose-50/90 border-rose-500 ring-2 ring-rose-400/40 shadow-sm"
+                              : "bg-gradient-to-br from-rose-50/40 to-white hover:bg-rose-50/70 border-rose-200"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 rounded-lg bg-rose-100 text-rose-800 font-mono text-xs font-black">Q4</span>
+                                <div>
+                                  <h5 className="text-xs font-black text-rose-950 tracking-tight">Cognitive Bottleneck / Roadblock</h5>
+                                  <span className="text-[9px] font-mono text-rose-700">Slow (&gt;45s) ‚Ä¢ Low Accuracy (&lt;75%)</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                                {staminaAnalyticsData.roadblockCount} Topics
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-zinc-600 leading-relaxed">
+                              Fundamental theoretical gaps causing both high hesitation time and incorrect final answers.
+                            </p>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-rose-200/60 flex items-center justify-between text-[9px] font-mono font-bold text-rose-800">
+                            <span>üí° Remedy: Blackboard Socratic Derivation with Cherry Ma'am</span>
+                            <span>{staminaQuadrantFilter === "roadblock" ? "Active Filter" : "Filter Topics ‚Üí"}</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: SOCRATIC SESSION FATIGUE & EXAM PACING FORECAST */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
+                      
+                      {/* Sub-Card 1: Mental Fatigue Degradation Curve (2 Cols) */}
+                      <div className="lg:col-span-2 bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-150 gap-2">
+                          <div>
+                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641] flex items-center gap-2">
+                              <Activity className="w-4 h-4 text-teal-700" />
+                              <span>Session Stamina & Cognitive Fatigue Timeline</span>
+                            </h4>
+                            <span className="text-[10px] text-zinc-400 font-mono">
+                              How mental endurance fluctuates across a 45-minute practice session
+                            </span>
+                          </div>
+                          <span className="text-[9.5px] font-mono font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
+                            üß† Optimal Focus: 25 Mins
+                          </span>
+                        </div>
+
+                        {/* Fatigue Timeline Cards - Horizontal Swipe Rail on Mobile */}
+                        <div className="flex items-center justify-between sm:hidden text-[9px] font-mono text-zinc-400 pb-0.5">
+                          <span>‚Üê Swipe 45-Min Timeline ‚Üí</span>
+                          <span>4 Intervals</span>
+                        </div>
+                        <div className="flex sm:grid sm:grid-cols-2 overflow-x-auto sm:overflow-visible gap-3 pt-1 pb-2 sm:pb-0 snap-x snap-mandatory scrollbar-thin">
+                          {staminaAnalyticsData.sessionFatigueCurve.map((phase, pIdx) => {
+                            const isZoneOfGenius = pIdx === 1;
+                            const isDip = pIdx === 3;
+
+                            return (
+                              <div
+                                key={pIdx}
+                                className={`p-3.5 rounded-2xl border space-y-2 w-[76vw] sm:w-auto shrink-0 sm:shrink snap-center ${
+                                  isZoneOfGenius
+                                    ? "bg-emerald-50/70 border-emerald-300 ring-1 ring-emerald-400/30"
+                                    : isDip
+                                    ? "bg-rose-50/70 border-rose-300"
+                                    : "bg-slate-50 border-zinc-200"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-xs font-black">
+                                  <span className="text-[#0a3641]">{phase.phase}</span>
+                                  <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                                    isZoneOfGenius
+                                      ? "bg-emerald-200 text-emerald-900"
+                                      : isDip
+                                      ? "bg-rose-200 text-rose-900"
+                                      : "bg-zinc-200 text-zinc-800"
+                                  }`}>
+                                    {phase.status}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1 text-[10px] font-mono text-zinc-600">
+                                  <div className="flex items-center justify-between">
+                                    <span>Accuracy:</span>
+                                    <strong className={phase.accuracy >= 80 ? "text-emerald-700" : "text-rose-700"}>
+                                      {phase.accuracy}%
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span>Avg Latency:</span>
+                                    <strong className="text-zinc-800">{phase.latencySec}s / question</strong>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span>Cognitive Load:</span>
+                                    <strong className="text-zinc-800">{phase.cognitiveLoad}%</strong>
+                                  </div>
+                                </div>
+
+                                <div className="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      isZoneOfGenius ? "bg-emerald-500" : isDip ? "bg-rose-500" : "bg-teal-500"
+                                    }`}
+                                    style={{ width: `${phase.accuracy}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="bg-amber-50/80 p-3 rounded-2xl border border-amber-200/80 flex items-start gap-2.5 text-[10.5px] text-amber-900">
+                          <Lightbulb className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <p>
+                            <strong>Cognitive Pacing Recommendation:</strong> Take a 3-minute Socratic reflection break after 25 minutes of continuous problem-solving to reset working memory load and prevent the 40-minute error spike.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Sub-Card 2: Predictive Board Exam Target Projector (1 Col) */}
+                      <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 flex flex-col justify-between">
+                        <div className="space-y-1 pb-3 border-b border-zinc-150">
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641] flex items-center gap-2">
+                            <Target className="w-4 h-4 text-indigo-700" />
+                            <span>Exam Target Projector</span>
+                          </h4>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            Based on current speed-accuracy calibration
+                          </span>
+                        </div>
+
+                        {/* Projected Big Score Dial */}
+                        <div className="bg-gradient-to-br from-[#071d24] to-[#041216] p-5 rounded-2xl text-center text-white border border-teal-500/30 space-y-2">
+                          <span className="text-[9.5px] font-mono uppercase tracking-widest text-teal-300 font-bold block">
+                            Projected Exam Mastery
+                          </span>
+                          <div className="text-3xl sm:text-4xl font-black text-[#c4f500] font-mono tracking-tight">
+                            {staminaAnalyticsData.projectedRawScore}%
+                          </div>
+                          <span className="text-[10px] font-mono text-zinc-300 block">
+                            Confidence Range: <strong className="text-white">{staminaAnalyticsData.projectedRawScore - staminaAnalyticsData.confidenceMargin}% ‚Äì {staminaAnalyticsData.projectedRawScore + staminaAnalyticsData.confidenceMargin}%</strong>
+                          </span>
+                        </div>
+
+                        {/* Time Allocation Breakdown */}
+                        <div className="space-y-2 text-[10px] font-mono">
+                          <span className="text-zinc-500 font-bold uppercase tracking-wider text-[8.5px] block">
+                            Recommended 3-Hour Paper Budget:
+                          </span>
+                          <div className="space-y-1 bg-slate-50 p-2.5 rounded-xl border border-zinc-200/80">
+                            <div className="flex items-center justify-between text-zinc-700">
+                              <span>Sec A (MCQ / Rapid):</span>
+                              <strong>35 Mins (1.5m / Q)</strong>
+                            </div>
+                            <div className="flex items-center justify-between text-zinc-700">
+                              <span>Sec B (Short Derivation):</span>
+                              <strong>55 Mins (3.5m / Q)</strong>
+                            </div>
+                            <div className="flex items-center justify-between text-zinc-700">
+                              <span>Sec C (Long Problems):</span>
+                              <strong>60 Mins (7.5m / Q)</strong>
+                            </div>
+                            <div className="flex items-center justify-between text-emerald-800 font-bold border-t border-zinc-200 pt-1">
+                              <span>Buffer / Step Verification:</span>
+                              <strong>30 Mins (Golden Reserve)</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onDiscussWithCherry) {
+                              onDiscussWithCherry({
+                                topic: "Exam Time Management & Speed-Accuracy Optimization",
+                                subject: subject || "Mathematics",
+                                conceptTested: "Exam Pacing Strategy",
+                                hint: "Learn 3-pass exam scanning: solve easy flow questions first, then overthink items, leaving roadblocks for last.",
+                                question: "Cherry Ma'am, how should I manage my time and pacing during the final board exam to avoid silly mistakes and rushing?"
+                              });
+                            } else if (onEnterClassroom) {
+                              onEnterClassroom();
+                            }
+                          }}
+                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-800 to-teal-900 hover:from-indigo-700 hover:to-teal-800 text-[#c4f500] text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Discuss Exam Strategy with Cherry Ma'am</span>
+                        </button>
+                      </div>
+
+                    </div>
+
+                    {/* SECTION 3: TOPICS AGILITY QUEUE & RAPID-FIRE SPEED DRILL SIMULATOR */}
+                    <div className="bg-white border border-zinc-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-5 text-left">
+                      
+                      {/* Filter Bar with Mobile Carousel/Grid Mode Toggle */}
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-zinc-150">
+                        <div className="flex items-center justify-between w-full lg:w-auto">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200/60 shrink-0">
+                              <Zap className="w-4 h-4 text-indigo-600" />
+                            </span>
+                            <div>
+                              <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0a3641]">
+                                Cognitive Agility & Latency Queue ({staminaAnalyticsData.topics.length})
+                              </h4>
+                              <span className="text-[10px] text-zinc-400 font-mono hidden sm:inline">
+                                Launch 60-second timed rapid-fire speed drills on blackboard to convert hesitations into flow state
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* View Mode Toggle */}
+                          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-zinc-200 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setStaminaViewMode("carousel")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                                staminaViewMode === "carousel"
+                                  ? "bg-[#0a3641] text-white shadow-2xs"
+                                  : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                              title="Horizontal Swipe Deck"
+                            >
+                              üé¥ Swipe Deck
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setStaminaViewMode("list")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                                staminaViewMode === "list"
+                                  ? "bg-[#0a3641] text-white shadow-2xs"
+                                  : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                              title="Grid List"
+                            >
+                              üìã Grid
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Subject Filter Pills */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                          {["all", "Mathematics", "Physics", "Chemistry", "Biology"].map((subj) => (
+                            <button
+                              key={subj}
+                              type="button"
+                              onClick={() => setStaminaActiveSubject(subj)}
+                              className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0 border ${
+                                staminaActiveSubject === subj
+                                  ? "bg-[#0a3641] text-white border-[#0a3641] shadow-2xs font-black"
+                                  : "bg-slate-50 text-zinc-600 border-zinc-200 hover:bg-slate-100 hover:text-zinc-900"
+                              }`}
+                            >
+                              {subj === "all" ? "üåê All Subjects" : subj}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Quadrant Filter Tabs */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {[
+                          { key: "all", label: "All Quadrants", count: staminaAnalyticsData.allTopics.length },
+                          { key: "flow", label: "‚ö° Flow State (Q1)", count: staminaAnalyticsData.flowCount },
+                          { key: "overthink", label: "‚è±Ô∏è Overthinking (Q2)", count: staminaAnalyticsData.overthinkCount },
+                          { key: "rushing", label: "‚ö†Ô∏è Impulsive Rushing (Q3)", count: staminaAnalyticsData.rushingCount },
+                          { key: "roadblock", label: "üî¥ Roadblocks (Q4)", count: staminaAnalyticsData.roadblockCount },
+                        ].map((tab) => (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setStaminaQuadrantFilter(tab.key as any)}
+                            className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0 border ${
+                              staminaQuadrantFilter === tab.key
+                                ? "bg-indigo-900 text-[#c4f500] border-indigo-900 shadow-2xs font-black"
+                                : "bg-white text-zinc-600 border-zinc-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span>{tab.label}</span>
+                            <span className="ml-1 text-[9px] opacity-80">({tab.count})</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Topics Cards Grid (Swipe Deck vs Grid) */}
+                      {staminaAnalyticsData.topics.length > 0 ? (
+                        <>
+                          {staminaViewMode === "carousel" && (
+                            <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-1 pb-1">
+                              <span>‚Üê Swipe Agility Drills ({staminaAnalyticsData.topics.length} topics) ‚Üí</span>
+                              <span>Touch & Drag</span>
+                            </div>
+                          )}
+                          <div className={
+                            staminaViewMode === "carousel"
+                              ? "flex overflow-x-auto gap-4 pb-3 pt-1 snap-x snap-mandatory scrollbar-thin"
+                              : "grid grid-cols-1 md:grid-cols-2 gap-4"
+                          }>
+                          {staminaAnalyticsData.topics.map((item) => {
+                            const isOverthink = item.quadrant === "overthink";
+                            const isRushing = item.quadrant === "rushing";
+                            const isRoadblock = item.quadrant === "roadblock";
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`rounded-2xl border p-4.5 transition-all flex flex-col justify-between space-y-3.5 relative overflow-hidden ${
+                                  isRoadblock
+                                    ? "bg-gradient-to-br from-white via-rose-50/20 to-rose-50/40 border-rose-200/90 shadow-2xs"
+                                    : isOverthink
+                                    ? "bg-gradient-to-br from-white via-sky-50/20 to-sky-50/40 border-sky-200/90 shadow-2xs"
+                                    : isRushing
+                                    ? "bg-gradient-to-br from-white via-amber-50/20 to-amber-50/40 border-amber-200/90 shadow-2xs"
+                                    : "bg-white border-emerald-200/80 shadow-2xs"
+                                }`}
+                              >
+                                {/* Header */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-slate-100 text-zinc-700 px-2 py-0.5 rounded-md border border-zinc-200">
+                                        {item.subject}
+                                      </span>
+                                      <span className="text-[9px] font-mono text-zinc-400 font-bold">
+                                        ‚Ä¢ {item.chapter}
+                                      </span>
+                                    </div>
+
+                                    {/* Quadrant Badge */}
+                                    <span className={`text-[9.5px] font-mono font-black px-2.5 py-0.5 rounded-lg border ${item.quadrantColor}`}>
+                                      {item.quadrantBadge}
+                                    </span>
+                                  </div>
+
+                                  <h5 className="text-xs sm:text-sm font-black text-[#0a3641] tracking-tight leading-snug">
+                                    {item.topicName}
+                                  </h5>
+                                </div>
+
+                                {/* Speed & Accuracy Benchmarks */}
+                                <div className="bg-slate-50/80 p-3 rounded-xl border border-zinc-150 space-y-2">
+                                  <div className="grid grid-cols-2 gap-2 text-[9.5px] font-mono">
+                                    <div className="bg-white p-2 rounded-lg border border-zinc-200">
+                                      <span className="text-zinc-400 block text-[8px] uppercase font-bold">Your Speed:</span>
+                                      <span className="text-xs font-black text-slate-800">{item.avgLatencySec}s</span>
+                                      <span className="text-[8px] text-zinc-400"> (Goal: {item.benchmarkSec}s)</span>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-lg border border-zinc-200">
+                                      <span className="text-zinc-400 block text-[8px] uppercase font-bold">Precision:</span>
+                                      <span className={`text-xs font-black ${item.accuracy >= 75 ? "text-emerald-700" : "text-rose-700"}`}>
+                                        {item.accuracy}% Accuracy
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-[9px] font-mono text-zinc-600 bg-white/70 p-2 rounded-lg border border-zinc-200/60">
+                                    <strong className="text-[#0a3641]">‚ö° Speed Strategy:</strong> {item.speedStrategy}
+                                  </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-150">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAgilityDrillTopic(item);
+                                      setActiveSprintSeconds(45);
+                                      setIsSprintRunning(false);
+                                      setSprintStepIndex(0);
+                                      setSprintScore(0);
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 text-[10px] font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <Gauge className="w-3 h-3 text-indigo-700" />
+                                    <span>Rapid Speed Drill</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (onDiscussWithCherry) {
+                                        onDiscussWithCherry({
+                                          topic: item.topicName,
+                                          subject: item.subject,
+                                          conceptTested: item.topicName,
+                                          hint: item.speedStrategy,
+                                          question: `Cherry Ma'am, please show me the fastest intuitive shortcut and blackboard derivation for ${item.topicName} so I can solve it in under 30 seconds!`
+                                        });
+                                      } else if (onEnterClassroom) {
+                                        onEnterClassroom();
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-800 to-[#0a3641] hover:from-indigo-700 hover:to-[#082d36] text-[#c4f500] text-[10px] font-black uppercase tracking-wider font-mono transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                                  >
+                                    <Zap className="w-3 h-3 text-[#c4f500]" />
+                                    <span>Learn Shortcut üöÄ</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        </>
+                      ) : (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-zinc-200 space-y-2">
+                          <p className="text-xs text-zinc-500 font-medium">
+                            No topics found for this agility quadrant.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStaminaActiveSubject("all");
+                              setStaminaQuadrantFilter("all");
+                            }}
+                            className="text-[10px] font-mono font-bold text-indigo-800 underline cursor-pointer"
+                          >
+                            Reset Quadrant Filters
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Interactive Rapid-Fire Speed Drill Modal */}
+                    {selectedAgilityDrillTopic && (
+                      <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fade-in">
+                        <div className="bg-[#05111d] border border-indigo-500/40 rounded-3xl max-w-xl w-full flex flex-col shadow-2xl overflow-hidden text-left text-white">
+                          
+                          {/* Modal Header */}
+                          <div className="px-5 py-4 bg-[#030b14] border-b border-indigo-950 flex items-center justify-between shrink-0">
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md border border-indigo-400/30">
+                                  {selectedAgilityDrillTopic.subject} ‚Ä¢ 45s Speed Drill
+                                </span>
+                                <span className="text-[9px] font-mono text-emerald-300">
+                                  Benchmark: <strong>{selectedAgilityDrillTopic.benchmarkSec}s</strong>
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-black text-white truncate">
+                                {selectedAgilityDrillTopic.topicName}
+                              </h3>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAgilityDrillTopic(null)}
+                              className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors cursor-pointer"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          {/* Speed Drill Body */}
+                          <div className="p-6 space-y-4">
+                            
+                            {/* Question Card */}
+                            <div className="bg-[#0a1829] border border-indigo-500/30 rounded-2xl p-5 space-y-3">
+                              <div className="flex items-center justify-between text-xs font-mono text-indigo-300">
+                                <span className="font-bold flex items-center gap-1.5">
+                                  <Zap className="w-3.5 h-3.5 text-[#c4f500]" /> Rapid-Fire Question:
+                                </span>
+                                <span className="text-amber-400 font-bold">Target: &lt;30s</span>
+                              </div>
+
+                              <p className="text-sm sm:text-base font-bold text-white leading-relaxed">
+                                {selectedAgilityDrillTopic.rapidFireQuestion}
+                              </p>
+
+                              {/* Options Grid */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                                {selectedAgilityDrillTopic.rapidFireOptions.map((opt: string, optIdx: number) => {
+                                  const isCorrect = optIdx === selectedAgilityDrillTopic.correctOptionIndex;
+                                  return (
+                                    <button
+                                      key={optIdx}
+                                      type="button"
+                                      onClick={() => {
+                                        setSprintScore(isCorrect ? 100 : 0);
+                                        setSprintStepIndex(1);
+                                      }}
+                                      className={`p-3 rounded-xl border text-xs font-mono font-bold text-left transition-all cursor-pointer ${
+                                        sprintStepIndex > 0
+                                          ? isCorrect
+                                            ? "bg-emerald-950/80 border-emerald-400 text-emerald-200"
+                                            : "bg-rose-950/40 border-rose-800 text-zinc-400 opacity-60"
+                                          : "bg-[#0f243a] hover:bg-[#153252] border-indigo-800 text-indigo-100 hover:border-indigo-400"
+                                      }`}
+                                    >
+                                      <span className="text-indigo-400 mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                                      <span>{opt}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Solution & Speed Strategy Reveal if answered */}
+                            {sprintStepIndex > 0 && (
+                              <div className="bg-slate-900/90 border border-teal-500/40 rounded-2xl p-4 space-y-2 animate-fade-in text-[11px] font-mono">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-emerald-400 font-black flex items-center gap-1">
+                                    <CheckCircle className="w-3.5 h-3.5" /> Correct Answer: Option {String.fromCharCode(65 + selectedAgilityDrillTopic.correctOptionIndex)}
+                                  </span>
+                                  <span className="text-[#c4f500] font-bold">Shortcut Verified</span>
+                                </div>
+                                <p className="text-slate-200 text-xs font-sans leading-relaxed">
+                                  {selectedAgilityDrillTopic.explanation}
+                                </p>
+                                <div className="text-[10px] text-teal-300 bg-teal-950/60 p-2 rounded-lg border border-teal-800/80 mt-1">
+                                  üí° <strong>Chalkboard Trick:</strong> {selectedAgilityDrillTopic.speedStrategy}
+                                </div>
+                              </div>
+                            )}
+
+                          </div>
+
+                          {/* Modal Footer */}
+                          <div className="px-5 py-3 bg-[#030b14] border-t border-indigo-950 flex items-center justify-between shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAgilityDrillTopic(null)}
+                              className="px-4 py-2 rounded-xl text-xs font-mono font-bold text-indigo-300 hover:bg-white/5 transition-colors cursor-pointer"
+                            >
+                              Close
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const drill = selectedAgilityDrillTopic;
+                                setSelectedAgilityDrillTopic(null);
+                                if (onDiscussWithCherry) {
+                                  onDiscussWithCherry({
+                                    topic: drill.topicName,
+                                    subject: drill.subject,
+                                    conceptTested: drill.topicName,
+                                    hint: drill.explanation,
+                                    question: `Cherry Ma'am, let's do a fast 3-question speed sprint on ${drill.topicName} on the digital blackboard!`
+                                  });
+                                } else if (onEnterClassroom) {
+                                  onEnterClassroom();
+                                }
+                              }}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-700 via-purple-800 to-teal-700 hover:from-indigo-600 text-white text-xs font-black uppercase font-mono tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[#c4f500]" />
+                              <span>Sprint on Blackboard with Cherry Ma'am üöÄ</span>
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                ) : (
+                  /* PHASE 4: OFFICIAL CURRICULUM & BLINDSPOT RADAR */
+                  performanceWorkspaceTab === "curriculum" ? (
+                    <CurriculumBlindspotTracker
+                      studentName={studentName || "Student"}
+                      studentGrade={typeof grade === "number" ? grade : 12}
+                      pastSessions={pastSessions}
+                      quizAttempts={quizAttempts}
+                      snapshots={snapshots}
+                      onDiscussWithCherry={onDiscussWithCherry}
+                      onEnterClassroom={onEnterClassroom}
+                    />
+                  ) : performanceWorkspaceTab === "prerequisites" ? (
+                    /* PHASE 5: PREREQUISITE DEPENDENCY GAP FINDER & KNOWLEDGE GRAPH */
+                    <PrerequisiteGapFinder
+                      studentName={studentName || "Student"}
+                      studentGrade={typeof grade === "number" ? grade : 12}
+                      pastSessions={pastSessions}
+                      quizAttempts={quizAttempts}
+                      snapshots={snapshots}
+                      onDiscussWithCherry={onDiscussWithCherry}
+                      onEnterClassroom={onEnterClassroom}
+                    />
+                  ) : (
+                    /* PHASE 6: EXAM SPEED SPRINT & TIME-PACING SIMULATOR */
+                    <ExamSpeedSprintSimulator
+                      studentName={studentName || "Student"}
+                      studentGrade={typeof grade === "number" ? grade : 12}
+                      pastSessions={pastSessions}
+                      quizAttempts={quizAttempts}
+                      snapshots={snapshots}
+                      onDiscussWithCherry={onDiscussWithCherry}
+                      onEnterClassroom={onEnterClassroom}
+                    />
+                  )
+                )}
+
+                {/* Bottom Quick-Jump Navigation Dock for Seamless Exploration */}
+                <div className="bg-slate-100/90 border border-zinc-200/90 p-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none shadow-2xs">
+                  <div className="flex items-center gap-2 text-zinc-600 font-mono text-[11px]">
+                    <span className="font-bold text-teal-900">‚ö° Quick Jump:</span>
+                    <span className="text-zinc-400">Navigate to another analytical dimension:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("macro"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "macro" ? "bg-[#0a3641] text-white shadow-xs" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      üéØ Macro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("micro"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "micro" ? "bg-teal-800 text-white shadow-xs" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      üî¨ Micro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("retention"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "retention" ? "bg-amber-700 text-white shadow-xs" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      üß† Retention
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("agility"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "agility" ? "bg-indigo-800 text-white shadow-xs" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      ‚ö° Agility
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("curriculum"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "curriculum" ? "bg-[#0a3641] text-[#c4f500] shadow-xs font-black" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      üó∫Ô∏è Syllabus
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("prerequisites"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "prerequisites" ? "bg-[#0a3641] text-[#c4f500] shadow-xs font-black" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      üîó Prereq Graph
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPerformanceWorkspaceTab("sprint"); }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-[10.5px] font-bold uppercase transition-all cursor-pointer ${
+                        performanceWorkspaceTab === "sprint" ? "bg-[#121c24] text-[#c4f500] shadow-xs font-black" : "bg-white text-zinc-600 hover:bg-slate-200/80 border border-zinc-200"
+                      }`}
+                    >
+                      ‚ö° Speed Sprint
+                    </button>
+                  </div>
+                </div>
+
                 {/* Dashboard bottom educational advice summary */}
                 <div className="bg-slate-50 border border-zinc-150 p-4.5 rounded-2xl flex items-start gap-3.5 text-left text-zinc-500 text-[10.5px] leading-relaxed">
                   <HelpCircle className="w-5 h-5 text-teal-800 shrink-0 mt-0.5" />
@@ -4805,36 +8517,133 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
               </div>
             ) : (
               <div className="space-y-6 animate-fade-in text-left">
-                {/* Unified Board-Book Hub Header - Ultra Premium & Sleek */}
-                <div className="bg-gradient-to-r from-[#07242b] via-[#0a3641] to-[#041a1e] px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl text-white shadow-sm border border-teal-500/20 relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 min-h-[58px]">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
+                {/* Executive Library Summary Hero Banner */}
+                <div className="bg-gradient-to-br from-[#062026] via-[#0a3641] to-[#041a1e] p-4 sm:p-6 rounded-3xl text-white shadow-md border border-teal-500/20 relative overflow-hidden flex flex-col gap-5">
+                  <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-400/10 rounded-full opacity-30 pointer-events-none" />
+                  <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-teal-500/10 rounded-full opacity-30 pointer-events-none" />
                   
-                  <div className="flex items-center gap-3 min-w-0 relative z-10">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400/25 to-teal-500/20 border border-emerald-400/35 text-emerald-300 flex items-center justify-center text-base font-bold shrink-0 shadow-inner">
-                      üìö
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xs sm:text-sm font-black tracking-tight text-white truncate">
-                          Unified Board-Book Hub
-                        </h3>
-                        <span className="text-[8px] font-mono font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 px-1.5 py-0.5 rounded-md hidden xs:inline-block">
-                          PRO ARCHIVE
-                        </span>
+                  {/* Top Bar inside Hero */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-emerald-400/30 to-teal-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center text-xl font-bold shrink-0 shadow-inner">
+                        üìö
                       </div>
-                      <p className="text-[10px] sm:text-[11px] text-teal-100/80 font-medium truncate mt-0.5">
-                        Centralized repository for live blackboard slates, comprehensive lecture books & AI revision decks.
-                      </p>
+                      <div className="text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm sm:text-base md:text-lg font-black tracking-tight text-white truncate">
+                            Executive Library & Board-Book Hub
+                          </h3>
+                          <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md hidden xs:inline-block shadow-2xs">
+                            PHASE 1 ACTIVE
+                          </span>
+                        </div>
+                        <p className="text-[11px] sm:text-xs text-teal-100/80 font-medium truncate mt-0.5">
+                          Centralized academic repository: live blackboard slates, comprehensive books & AI revision flashcard decks.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 relative z-10 shrink-0 self-start sm:self-auto">
+                      <span className="inline-flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider bg-black/30 text-teal-200 px-3.5 py-1.5 rounded-xl border border-teal-400/25 shadow-inner">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Curriculum: {grade || "Class 10"} ‚Ä¢ {board || "CBSE"}</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 relative z-10 shrink-0 self-start sm:self-auto">
-                    <span className="inline-flex items-center gap-1.5 text-[9.5px] font-mono font-bold uppercase tracking-wider bg-black/25 text-teal-200 px-3 py-1 rounded-xl border border-teal-400/20 shadow-inner">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{allSnapshots.length} Slates</span>
-                      <span className="text-teal-400/50">‚Ä¢</span>
-                      <span>{pastSessions.length} Books</span>
+                  {/* 4 Hero Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5 relative z-10">
+                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-teal-300 mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Chapter Books</span>
+                        <BookOpen className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                        {allBooks.length}
+                      </div>
+                      <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
+                        Interactive Handbooks
+                      </span>
+                    </div>
+
+                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-teal-300 mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Board Slates</span>
+                        <Camera className="w-4 h-4 text-teal-400" />
+                      </div>
+                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                        {allSnapshots.length}
+                      </div>
+                      <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
+                        HD Chalk Captures
+                      </span>
+                    </div>
+
+                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-teal-300 mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Smart Decks</span>
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                        {allBooks.length}
+                      </div>
+                      <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
+                        Flashcards & Mind Maps
+                      </span>
+                    </div>
+
+                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-teal-300 mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Subject Scope</span>
+                        <Layers className="w-4 h-4 text-sky-400" />
+                      </div>
+                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                        {Object.keys(bookSubjectCounts).filter(k => k !== "all" && bookSubjectCounts[k] > 0).length || 1}
+                      </div>
+                      <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
+                        Active Disciplines
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Subject Quick Glance Bar */}
+                  <div className="flex items-center gap-2 pt-1 overflow-x-auto scrollbar-thin relative z-10 text-xs">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-teal-300/80 shrink-0 font-bold">
+                      Subject Distribution:
                     </span>
+                    {[
+                      { key: "Mathematics", label: "Math", icon: "üìê", count: bookSubjectCounts.Mathematics || 0 },
+                      { key: "Physics", label: "Physics", icon: "‚ö°", count: bookSubjectCounts.Physics || 0 },
+                      { key: "Chemistry", label: "Chemistry", icon: "üß™", count: bookSubjectCounts.Chemistry || 0 },
+                      { key: "Biology", label: "Biology", icon: "üå±", count: bookSubjectCounts.Biology || 0 },
+                      { key: "Science", label: "Science", icon: "üî¨", count: bookSubjectCounts.Science || 0 }
+                    ]
+                      .filter(s => s.count > 0)
+                      .map((subj) => (
+                        <button
+                          key={subj.key}
+                          type="button"
+                          onClick={() => {
+                            setSelectedBookSubjectFilter(subj.key);
+                            setSelectedSnapshotSubjectFilter(subj.key);
+                          }}
+                          className={`px-2.5 py-1 rounded-xl font-mono text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                            selectedBookSubjectFilter.toLowerCase() === subj.key.toLowerCase()
+                              ? "bg-white text-[#0a3641] border-white shadow-xs font-black"
+                              : "bg-white/10 hover:bg-white/20 text-teal-100 border-white/15"
+                          }`}
+                        >
+                          <span>{subj.icon}</span>
+                          <span>{subj.label}</span>
+                          <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
+                            selectedBookSubjectFilter.toLowerCase() === subj.key.toLowerCase()
+                              ? "bg-[#0a3641] text-[#c4f500]"
+                              : "bg-white/20 text-white"
+                          }`}>
+                            {subj.count}
+                          </span>
+                        </button>
+                      ))}
                   </div>
                 </div>
 
@@ -4854,10 +8663,21 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                         High-fidelity vector & chalk slates captured in real-time as Cherry Ma'am writes derivations and diagrams.
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50/80 border border-teal-200 text-teal-900 text-[9.5px] font-mono font-black self-start sm:self-auto shadow-2xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Live Blackboard Sync
-                    </span>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={handleBatchExportSnapshotsMarkdown}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-300 text-teal-900 text-[10px] font-mono font-bold transition-all cursor-pointer shadow-2xs"
+                        title="Export all blackboard derivations into a consolidated Markdown revision album"
+                      >
+                        <Download className="w-3 h-3 text-teal-700" />
+                        <span>Export Notes Album</span>
+                      </button>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50/80 border border-teal-200 text-teal-900 text-[9.5px] font-mono font-black shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live Sync
+                      </span>
+                    </div>
                   </div>
 
                   {allSnapshots && allSnapshots.length > 0 ? (
@@ -4903,7 +8723,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                           })}
                       </div>
 
-                      {/* Search Bar & Horizontal Navigation Controls */}
+                      {/* Search Bar & Smart Layout Switcher */}
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                         <div className="relative flex-1">
                           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 stroke-[2.5]" />
@@ -4912,7 +8732,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                             value={snapshotSearchQuery} 
                             onChange={(e) => setSnapshotSearchQuery(e.target.value)} 
                             placeholder="Search board slates by topic, formula, or concept..." 
-                            className="w-full pl-10 pr-9 py-2.5 bg-white border border-zinc-200 rounded-xl text-xs font-semibold placeholder:text-zinc-400 text-zinc-800 focus:outline-hidden focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-all font-mono shadow-2xs"
+                            className="w-full pl-10 pr-9 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold placeholder:text-zinc-400 text-zinc-800 focus:outline-hidden focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-all font-mono shadow-2xs"
                           />
                           {snapshotSearchQuery && (
                             <button 
@@ -4924,36 +8744,65 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                           )}
                         </div>
 
-                        {/* Navigation Arrows & Counter for Horizontal Scrolling */}
-                        {filteredSnapshots.length > 1 && (
-                          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 bg-white px-3 py-1.5 rounded-xl border border-zinc-200 shadow-2xs">
-                            <span className="text-[10px] font-mono font-black text-[#0a3641] uppercase tracking-wider">
-                              Slide <span className="text-teal-700 font-extrabold">{currentSnapshotHorizontalIndex + 1}</span> of {filteredSnapshots.length}
-                            </span>
-                            <div className="flex items-center gap-1">
+                        {/* View Switcher: Grid vs Carousel */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="inline-flex p-1 bg-zinc-100 rounded-xl border border-zinc-200/80 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => setSnapshotsViewMode("grid")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                snapshotsViewMode === "grid"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Grid View (All slates at a glance)"
+                            >
+                              <Grid className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Grid</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSnapshotsViewMode("carousel")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                snapshotsViewMode === "carousel"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Carousel View (Widescreen slider)"
+                            >
+                              <Film className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Carousel</span>
+                            </button>
+                          </div>
+
+                          {/* Navigation Controls in Carousel Mode */}
+                          {snapshotsViewMode === "carousel" && filteredSnapshots.length > 1 && (
+                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-zinc-200 shadow-2xs">
+                              <span className="text-[10px] font-mono font-black text-[#0a3641]">
+                                {currentSnapshotHorizontalIndex + 1}/{filteredSnapshots.length}
+                              </span>
                               <button
                                 type="button"
                                 onClick={() => handleSnapshotHorizontalScroll("prev")}
                                 disabled={currentSnapshotHorizontalIndex === 0}
-                                className="p-1.5 rounded-lg bg-zinc-50 hover:bg-teal-50 hover:text-teal-800 text-zinc-700 disabled:opacity-30 disabled:pointer-events-none transition-all border border-zinc-200 cursor-pointer"
-                                title="Previous Slide (Swipe Left)"
+                                className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 cursor-pointer"
                               >
-                                <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <ChevronLeft className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleSnapshotHorizontalScroll("next")}
                                 disabled={currentSnapshotHorizontalIndex >= filteredSnapshots.length - 1}
-                                className="p-1.5 rounded-lg bg-zinc-50 hover:bg-teal-50 hover:text-teal-800 text-zinc-700 disabled:opacity-30 disabled:pointer-events-none transition-all border border-zinc-200 cursor-pointer"
-                                title="Next Slide (Swipe Right)"
+                                className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 cursor-pointer"
                               >
-                                <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <ChevronRight className="w-3.5 h-3.5" />
                               </button>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
 
+                      {/* Snapshots Content Rendering: Grid vs Carousel */}
                       {filteredSnapshots.length === 0 ? (
                         <div className="border border-dashed border-zinc-200 rounded-2xl p-8 bg-zinc-50/50 text-center select-none space-y-2">
                           <p className="text-xs font-black text-zinc-600">No matching blackboard snapshots found</p>
@@ -4971,6 +8820,95 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                               Show All Subjects
                             </button>
                           )}
+                        </div>
+                      ) : snapshotsViewMode === "grid" ? (
+                        /* Modern Responsive Grid View */
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
+                          {filteredSnapshots.map((snap, idx) => {
+                            const snapSubject = snap.subject || inferSnapshotSubject(snap);
+                            return (
+                              <div
+                                key={snap.id || snap.snapshotId || idx}
+                                className="group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all flex flex-col justify-between"
+                              >
+                                {/* Thumbnail */}
+                                <div
+                                  onClick={() => setSelectedSnapshotForModal(snap)}
+                                  className="relative aspect-[16/10] bg-[#071f18] overflow-hidden cursor-pointer flex items-center justify-center border-b border-zinc-100 group/slate"
+                                >
+                                  {snap.imgData ? (
+                                    <img 
+                                      src={snap.imgData} 
+                                      alt={snap.topicTitle} 
+                                      className="w-full h-full object-cover group-hover/slate:scale-105 transition-transform duration-300"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  ) : (
+                                    <div className="text-center p-3 text-zinc-400 font-mono text-xs">
+                                      Blackboard Slate
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-[#0a3641]/40 opacity-0 group-hover/slate:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[2px]">
+                                    <span className="px-2.5 py-1.5 bg-white/95 text-[#0a3641] rounded-lg shadow-md text-[10.5px] font-black flex items-center gap-1.5">
+                                      <ZoomIn className="w-3.5 h-3.5 text-teal-700" /> Zoom
+                                    </span>
+                                  </div>
+                                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-[#07242b]/90 text-[#c4f500] text-[9px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/30">
+                                    Slate #{idx + 1}
+                                  </span>
+                                </div>
+
+                                {/* Body */}
+                                <div className="p-3.5 flex flex-col justify-between flex-1 space-y-3">
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[9px] font-mono font-black px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200/60">
+                                        {snapSubject}
+                                      </span>
+                                      <span className="text-[8.5px] font-mono text-zinc-400">
+                                        {formatDate(snap.timestamp)}
+                                      </span>
+                                    </div>
+                                    <h5 className="text-xs font-black text-[#0a3641] font-sans leading-snug line-clamp-1">
+                                      {snap.topicTitle || "Classroom Board Snapshot"}
+                                    </h5>
+                                    <p className="text-[10px] text-zinc-500 line-clamp-2 leading-relaxed">
+                                      {snap.description || "Auto-saved blackboard derivation, formulas & step-by-step calculations."}
+                                    </p>
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="pt-2 border-t border-zinc-100 flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadImage(snap)}
+                                      className="flex-1 py-1.5 px-2.5 bg-gradient-to-r from-teal-700 to-[#0a3641] hover:from-teal-600 hover:to-teal-900 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                                      title="Download high-definition blackboard JPG"
+                                    >
+                                      <Download className="w-3 h-3 stroke-[2.5]" />
+                                      <span>Download</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedSnapshotForModal(snap)}
+                                      className="p-1.5 bg-zinc-50 hover:bg-teal-50 text-zinc-600 hover:text-teal-800 rounded-lg border border-zinc-200 cursor-pointer"
+                                      title="Zoom in Fullscreen"
+                                    >
+                                      <ZoomIn className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSnapshot(snap.id || snap.snapshotId)}
+                                      className="p-1.5 bg-zinc-50 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-lg border border-zinc-200 cursor-pointer"
+                                      title="Delete snapshot"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -5154,13 +9092,14 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none select-none">
                         {[
                           { key: "all", label: "All Subjects", icon: "üìö", count: bookSubjectCounts.all || allBooks.length },
+                          { key: "starred", label: "Starred Books", icon: "‚≠ê", count: bookSubjectCounts.starred || 0 },
                           { key: "Mathematics", label: "Mathematics", icon: "üìê", count: bookSubjectCounts.Mathematics || 0 },
                           { key: "Physics", label: "Physics", icon: "‚ö°", count: bookSubjectCounts.Physics || 0 },
                           { key: "Chemistry", label: "Chemistry", icon: "üß™", count: bookSubjectCounts.Chemistry || 0 },
                           { key: "Biology", label: "Biology", icon: "üå±", count: bookSubjectCounts.Biology || 0 },
                           { key: "Science", label: "Science", icon: "üî¨", count: bookSubjectCounts.Science || 0 },
                           ...Object.keys(bookSubjectCounts)
-                            .filter(k => !["all", "Mathematics", "Physics", "Chemistry", "Biology", "Science"].includes(k) && bookSubjectCounts[k] > 0)
+                            .filter(k => !["all", "starred", "Mathematics", "Physics", "Chemistry", "Biology", "Science"].includes(k) && bookSubjectCounts[k] > 0)
                             .map(k => ({ key: k, label: k, icon: "üìñ", count: bookSubjectCounts[k] }))
                         ]
                           .filter(tab => tab.key === "all" || tab.count > 0)
@@ -5195,8 +9134,8 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                           })}
                       </div>
 
-                      {/* Search Bar + Slide Navigation Controls */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-0.5">
+                      {/* Search Bar + Sort & View Mode Controls */}
+                      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 pt-0.5">
                         {/* Search Input */}
                         <div className="relative flex-1">
                           <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 stroke-[2.5]" />
@@ -5226,41 +9165,248 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                           )}
                         </div>
 
-                        {/* Slide Stepper Controls */}
-                        {filteredBooks.length > 0 && (
-                          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-                            <span className="text-[11px] font-mono text-zinc-500 font-bold px-2 py-1 bg-zinc-100/80 rounded-lg border border-zinc-200/60">
-                              Slide {Math.min(currentBookHorizontalIndex + 1, filteredBooks.length)} of {filteredBooks.length}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleBooksHorizontalScroll("prev")}
-                                disabled={currentBookHorizontalIndex === 0}
-                                className="p-2 rounded-xl bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all shadow-2xs active:scale-95"
-                                title="Previous Book Slide"
-                              >
-                                <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleBooksHorizontalScroll("next")}
-                                disabled={currentBookHorizontalIndex >= filteredBooks.length - 1}
-                                className="p-2 rounded-xl bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all shadow-2xs active:scale-95"
-                                title="Next Book Slide"
-                              >
-                                <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-                              </button>
-                            </div>
+                        {/* Controls Toolbar: Sort Selector + Layout Mode + Stepper */}
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                          {/* Sort Dropdown */}
+                          <div className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-zinc-200 shadow-2xs">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400 stroke-[2.5]" />
+                            <select
+                              value={bookSortOrder}
+                              onChange={(e) => setBookSortOrder(e.target.value as any)}
+                              className="text-xs font-bold text-zinc-700 bg-transparent border-none focus:outline-hidden cursor-pointer"
+                            >
+                              <option value="newest">Newest First</option>
+                              <option value="oldest">Oldest First</option>
+                              <option value="title">By Chapter Title</option>
+                              <option value="topics">Most Topics</option>
+                            </select>
                           </div>
-                        )}
+
+                          {/* View Switcher: Grid vs Carousel */}
+                          <div className="inline-flex p-1 bg-zinc-100 rounded-xl border border-zinc-200/80 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => setBooksViewMode("grid")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                booksViewMode === "grid"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Grid View (All books at a glance)"
+                            >
+                              <Grid className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Grid</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setBooksViewMode("carousel")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                booksViewMode === "carousel"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Carousel View (Widescreen slider)"
+                            >
+                              <Film className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Carousel</span>
+                            </button>
+                          </div>
+
+                          {/* Slide Stepper Controls (Carousel Mode Only) */}
+                          {booksViewMode === "carousel" && filteredBooks.length > 0 && (
+                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-zinc-200 shadow-2xs">
+                              <span className="text-[10px] font-mono font-black text-[#0a3641]">
+                                {Math.min(currentBookHorizontalIndex + 1, filteredBooks.length)}/{filteredBooks.length}
+                              </span>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleBooksHorizontalScroll("prev")}
+                                  disabled={currentBookHorizontalIndex === 0}
+                                  className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                  title="Previous Book Slide"
+                                >
+                                  <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBooksHorizontalScroll("next")}
+                                  disabled={currentBookHorizontalIndex >= filteredBooks.length - 1}
+                                  className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                  title="Next Book Slide"
+                                >
+                                  <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Content: Empty Search / Books Horizontal Ribbon */}
+                      {/* Content: Empty Search / Books Grid vs Carousel View */}
                       {filteredBooks.length === 0 ? (
                         <div className="border border-dashed border-zinc-200 rounded-2xl p-8 bg-zinc-50/50 text-center select-none space-y-1">
                           <p className="text-xs font-black text-zinc-500">No matching lecture books found</p>
                           <p className="text-[10px] text-zinc-400">Try adjusting your keyword search or selected subject filter.</p>
+                        </div>
+                      ) : booksViewMode === "grid" ? (
+                        /* Responsive Grid View for Chapter Books with 3D Binder Aesthetic */
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
+                          {filteredBooks.map((sess, idx) => {
+                            const hasContent = !!(
+                              sess.customBoardContent || 
+                              sess.documentMarkdown || 
+                              sess.activeDocumentMarkdown || 
+                              (sess.topicBoardsContent && Object.keys(sess.topicBoardsContent).length > 0) || 
+                              (sess.topics && sess.topics.length > 0)
+                            );
+                            const isYoutubeSess = sess.processedTitle?.includes("YouTube") || sess.processedTitle?.includes("(ID: ");
+                            const bookSubject = sess.inferredSubject;
+                            const theme = getSubjectBookTheme(bookSubject);
+                            const topicCount = sess.topics && sess.topics.length > 0 ? sess.topics.length : 1;
+
+                            return (
+                              <div
+                                key={sess.sessionId || sess.id || idx}
+                                className="group relative border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-lg hover:border-teal-500/50 transition-all duration-300 flex flex-col justify-between hover:-translate-y-0.5"
+                              >
+                                {/* 3D Chalkboard Book Cover with Spine & Page-Edge Accent */}
+                                <div
+                                  onClick={() => setSelectedBookForReader(sess)}
+                                  className={`relative aspect-[16/10] bg-gradient-to-br from-[#061f19] via-[#092d24] to-[#041a15] p-3.5 pl-7 sm:pl-8 flex flex-col justify-between cursor-pointer overflow-hidden border-b border-zinc-100 group/cover select-none ${theme.pageEdge}`}
+                                >
+                                  {/* Left 3D Binder Spine & Ring Effect */}
+                                  <div className="absolute left-0 top-0 bottom-0 w-5 sm:w-6 bg-gradient-to-r from-black/60 via-black/30 to-transparent flex flex-col items-center justify-around py-3 z-20 border-r border-white/10 shadow-inner">
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                  </div>
+
+                                  {/* Subject Accent Vertical Stripe on Spine */}
+                                  <div className={`absolute left-5 sm:left-6 top-0 bottom-0 w-[2.5px] bg-gradient-to-b ${theme.gradientBar} opacity-80 z-20`} />
+
+                                  {/* Grid & Chalk texture */}
+                                  <div className="absolute inset-0 bg-[radial-gradient(#14b8a6_0.75px,transparent_0.75px)] [background-size:12px_12px] opacity-20 pointer-events-none" />
+                                  <div 
+                                    className="absolute -top-10 -right-10 w-36 h-36 rounded-full opacity-25 pointer-events-none opacity-40" 
+                                    style={{ background: theme.glowColor }}
+                                  />
+
+                                  {/* Top Badges & Star Button */}
+                                  <div className="relative z-10 flex items-center justify-between gap-1">
+                                    <div className="flex items-center gap-1">
+                                      <span className="px-2 py-0.5 rounded-md bg-[#07242b]/95 text-[#c4f500] text-[8.5px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/40 shadow-2xs">
+                                        Book #{idx + 1}
+                                      </span>
+                                      {isYoutubeSess && (
+                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-red-600/95 text-white font-mono flex items-center gap-1 shadow-2xs">
+                                          <Youtube className="w-2.5 h-2.5" /> Video
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleStarBook(sess.sessionId || sess.id || `book_${sess.index || idx}`, e)}
+                                      className={`p-1 rounded-md border transition-all cursor-pointer shadow-2xs z-30 ${
+                                        starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`]
+                                          ? "bg-amber-400 text-slate-950 border-amber-500 shadow-sm"
+                                          : "bg-black/40 hover:bg-black/60 text-white/70 hover:text-white border-white/20"
+                                      }`}
+                                      title={starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "Remove from Starred" : "Star / Bookmark this book"}
+                                    >
+                                      <Star className={`w-3 h-3 ${starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "fill-slate-950" : ""}`} />
+                                    </button>
+                                  </div>
+
+                                  {/* Center Title & Subject */}
+                                  <div className="relative z-10 space-y-1 my-auto pr-1">
+                                    <div className="flex items-center gap-1.5 text-[9.5px] font-mono font-bold tracking-wide" style={{ color: theme.tagColor }}>
+                                      <span>{theme.icon}</span>
+                                      <span className="uppercase">{bookSubject}</span>
+                                    </div>
+                                    <h4 className="text-xs font-black text-white leading-snug line-clamp-2 drop-shadow-2xs font-sans group-hover/cover:text-teal-200 transition-colors">
+                                      {sess.processedTitle}
+                                    </h4>
+                                  </div>
+
+                                  {/* Bottom slate meta */}
+                                  <div className="relative z-10 flex items-center justify-between text-[8px] font-mono text-teal-200/80 pt-1 border-t border-white/10">
+                                    <span className="truncate max-w-[110px]">{sess.formattedDateTime}</span>
+                                    <span className="font-bold text-[#c4f500]">{topicCount} {topicCount === 1 ? "Topic" : "Topics"}</span>
+                                  </div>
+
+                                  {/* Hover overlay with Quick Read button */}
+                                  <div className="absolute inset-0 bg-[#061f19]/75 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[2px] z-30">
+                                    <span className="px-3 py-1.5 bg-white text-[#0a3641] rounded-xl shadow-lg text-[10.5px] font-black flex items-center gap-1.5 transform translate-y-1 group-hover/cover:translate-y-0 transition-transform">
+                                      <BookOpen className="w-3 h-3 text-teal-700" /> Read Notes
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Body & Dual Action Buttons */}
+                                <div className="p-3 flex flex-col justify-between flex-1 space-y-2.5 bg-gradient-to-b from-white to-zinc-50/40">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-[9px] font-mono">
+                                      <span className={`font-black px-1.5 py-0.5 rounded-md border text-[8.5px] ${theme.badgeBg}`}>
+                                        {theme.icon} {bookSubject}
+                                      </span>
+                                      <span className="text-zinc-600 font-bold bg-zinc-100 px-1.5 py-0.5 rounded-md">
+                                        Lesson #{sess.index}
+                                      </span>
+                                    </div>
+                                    <h5 
+                                      onClick={() => setSelectedBookForReader(sess)}
+                                      className="text-xs font-bold text-[#0a3641] line-clamp-1 cursor-pointer hover:text-teal-700 transition-colors pt-0.5"
+                                    >
+                                      {sess.processedTitle}
+                                    </h5>
+                                  </div>
+
+                                  {/* Dual Actions: Quick Read & Smart Revision */}
+                                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedBookForReader(sess)}
+                                      className="py-1.5 px-2 rounded-xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 cursor-pointer active:scale-95 shadow-2xs"
+                                      title="Open In-App Textbook & Formula Reader"
+                                    >
+                                      <BookOpen className="w-3 h-3 text-teal-700 shrink-0" />
+                                      <span className="truncate">Read</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const cachedDeck = localStorage.getItem(`revision_deck_${sess.sessionId || sess.index}`);
+                                        if (cachedDeck) {
+                                          try {
+                                            const parsed = JSON.parse(cachedDeck);
+                                            const hasValidMindMap = parsed && parsed.mindMap && Array.isArray(parsed.mindMap.nodes) && parsed.mindMap.nodes.length > 0;
+                                            if (hasValidMindMap) {
+                                              handleOpenRevisionDeck(sess, parsed);
+                                              return;
+                                            }
+                                          } catch (_) {}
+                                        }
+                                        handleGenerateRevisionDeck(sess);
+                                      }}
+                                      disabled={!hasContent}
+                                      className={`py-1.5 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs ${
+                                        hasContent
+                                          ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white active:scale-95 shadow-amber-500/20"
+                                          : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
+                                      }`}
+                                      title={hasContent ? "Launch AI Flashcards & Mind Map" : "No notes available"}
+                                    >
+                                      <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
+                                      <span className="truncate">Revise</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -5281,7 +9427,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                               );
                               const isYoutubeSess = sess.processedTitle?.includes("YouTube") || sess.processedTitle?.includes("(ID: ");
                               const bookSubject = sess.inferredSubject;
-                              const subjectIcon = bookSubject === "Mathematics" ? "üìê" : bookSubject === "Physics" ? "‚ö°" : bookSubject === "Chemistry" ? "üß™" : bookSubject === "Biology" ? "üå±" : "üî¨";
+                              const theme = getSubjectBookTheme(bookSubject);
                               const topicCount = sess.topics && sess.topics.length > 0 ? sess.topics.length : 1;
                               
                               // Topics preview list
@@ -5292,55 +9438,74 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                               return (
                                 <div 
                                   key={sess.sessionId || sess.id || idx}
-                                  className="w-full min-w-full flex-shrink-0 snap-center group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all flex flex-col md:flex-row"
+                                  className="w-full min-w-full flex-shrink-0 snap-center group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-lg hover:border-teal-500/50 transition-all duration-300 flex flex-col md:flex-row"
                                 >
                                   {/* Left/Top: High-Definition Widescreen Chalkboard Lecture Book Cover Slate */}
                                   <div 
-                                    onClick={() => {
-                                      if (!hasContent) return;
-                                      const cachedDeck = localStorage.getItem(`revision_deck_${sess.sessionId || sess.index}`);
-                                      if (cachedDeck) {
-                                        try {
-                                          const parsed = JSON.parse(cachedDeck);
-                                          const hasValidMindMap = parsed && parsed.mindMap && Array.isArray(parsed.mindMap.nodes) && parsed.mindMap.nodes.length > 0;
-                                          if (hasValidMindMap) {
-                                            handleOpenRevisionDeck(sess, parsed);
-                                            return;
-                                          }
-                                        } catch (_) {}
-                                      }
-                                      handleGenerateRevisionDeck(sess);
-                                    }}
-                                    className="relative w-full md:w-3/5 lg:w-2/3 min-h-[230px] sm:min-h-[250px] md:h-76 bg-[#071f18] overflow-hidden cursor-pointer flex flex-col justify-between p-5 sm:p-6 border-b md:border-b-0 md:border-r border-zinc-100 shrink-0 group/bookcover select-none"
+                                    onClick={() => setSelectedBookForReader(sess)}
+                                    className={`relative w-full md:w-3/5 lg:w-2/3 min-h-[230px] sm:min-h-[250px] md:h-76 bg-gradient-to-br from-[#061f19] via-[#092d24] to-[#041a15] overflow-hidden cursor-pointer flex flex-col justify-between p-5 sm:p-6 pl-8 sm:pl-10 border-b md:border-b-0 md:border-r border-zinc-100 shrink-0 group/bookcover select-none ${theme.pageEdge}`}
                                   >
-                                    {/* Subtle Grid / Chalkboard texture glow */}
-                                    <div className="absolute inset-0 bg-[radial-gradient(#115e59_1px,transparent_1px)] [background-size:16px_16px] opacity-25 pointer-events-none" />
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+                                    {/* Left 3D Binder Spine & Ring Effect */}
+                                    <div className="absolute left-0 top-0 bottom-0 w-7 sm:w-8 bg-gradient-to-r from-black/60 via-black/30 to-transparent flex flex-col items-center justify-around py-4 z-20 border-r border-white/10 shadow-inner">
+                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    </div>
 
-                                    {/* Top Banner inside Slate */}
+                                    {/* Subject Accent Vertical Stripe on Spine */}
+                                    <div className={`absolute left-7 sm:left-8 top-0 bottom-0 w-[3px] bg-gradient-to-b ${theme.gradientBar} opacity-80 z-20`} />
+
+                                    {/* Grid Texture & Radiant Glow */}
+                                    <div className="absolute inset-0 bg-[radial-gradient(#14b8a6_0.75px,transparent_0.75px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
+                                    <div 
+                                      className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-30 pointer-events-none opacity-40" 
+                                      style={{ background: theme.glowColor }}
+                                    />
+
+                                    {/* Top Banner inside Slate & Star Button */}
                                     <div className="relative z-10 flex items-center justify-between gap-2">
-                                      <span className="px-2.5 py-1 rounded-lg bg-[#07242b]/90 text-[#c4f500] text-[9.5px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/30 shadow-xs flex items-center gap-1.5">
-                                        <span>üìñ</span>
-                                        <span>Deck #{idx + 1} of {filteredBooks.length}</span>
-                                      </span>
-
-                                      {isYoutubeSess && (
-                                        <span className="text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-600/90 text-white flex items-center gap-1 font-mono shadow-xs border border-red-400/30">
-                                          <Youtube className="w-2.5 h-2.5" /> Video Lecture Sync
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2.5 py-1 rounded-lg bg-[#07242b]/95 text-[#c4f500] text-[9.5px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/40 shadow-xs flex items-center gap-1.5">
+                                          <span>üìñ</span>
+                                          <span>Book #{idx + 1} of {filteredBooks.length}</span>
                                         </span>
-                                      )}
+
+                                        {isYoutubeSess && (
+                                          <span className="text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-600/90 text-white flex items-center gap-1 font-mono shadow-xs border border-red-400/30">
+                                            <Youtube className="w-2.5 h-2.5" /> Video Lecture Sync
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => toggleStarBook(sess.sessionId || sess.id || `book_${sess.index || idx}`, e)}
+                                        className={`px-2 py-1 rounded-lg border text-xs font-mono font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs z-30 ${
+                                          starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`]
+                                            ? "bg-amber-400 text-slate-950 border-amber-500"
+                                            : "bg-black/40 hover:bg-black/60 text-white/80 hover:text-white border-white/20"
+                                        }`}
+                                        title={starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "Remove from Starred" : "Star / Bookmark this book"}
+                                      >
+                                        <Star className={`w-3.5 h-3.5 ${starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "fill-slate-950" : ""}`} />
+                                        <span className="text-[9px] font-sans font-bold hidden sm:inline">
+                                          {starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "Starred" : "Star"}
+                                        </span>
+                                      </button>
                                     </div>
 
                                     {/* Center Book Slate Info */}
                                     <div className="relative z-10 my-auto space-y-2 py-2">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xl sm:text-2xl">{subjectIcon}</span>
-                                        <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest text-teal-300 uppercase">
+                                        <span className="text-xl sm:text-2xl">{theme.icon}</span>
+                                        <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: theme.tagColor }}>
                                           {bookSubject} ‚Ä¢ {sess.grade || grade || "Class 10"}
                                         </span>
                                       </div>
 
-                                      <h3 className="text-sm sm:text-base md:text-lg font-black text-white tracking-tight leading-snug line-clamp-2 drop-shadow-sm font-sans">
+                                      <h3 className="text-sm sm:text-base md:text-lg font-black text-white tracking-tight leading-snug line-clamp-2 drop-shadow-sm font-sans group-hover/bookcover:text-teal-200 transition-colors">
                                         {sess.processedTitle}
                                       </h3>
 
@@ -5375,9 +9540,9 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                     </div>
 
                                     {/* Hover overlay */}
-                                    <div className="absolute inset-0 bg-[#0a3641]/50 opacity-0 group-hover/bookcover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px] z-20">
-                                      <span className="px-4 py-2 bg-white/95 text-[#0a3641] rounded-xl shadow-lg text-xs font-black flex items-center gap-2 transform translate-y-1 group-hover/bookcover:translate-y-0 transition-transform cursor-pointer">
-                                        <Sparkles className="w-4 h-4 stroke-[2.5] text-amber-600 animate-pulse" /> Launch Smart Revision
+                                    <div className="absolute inset-0 bg-[#061f19]/70 opacity-0 group-hover/bookcover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px] z-30">
+                                      <span className="px-4 py-2 bg-white text-[#0a3641] rounded-xl shadow-lg text-xs font-black flex items-center gap-2 transform translate-y-1 group-hover/bookcover:translate-y-0 transition-transform cursor-pointer">
+                                        <BookOpen className="w-4 h-4 stroke-[2.5] text-teal-700" /> Open Quick Reader
                                       </span>
                                     </div>
                                   </div>
@@ -5387,15 +9552,8 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                     <div className="space-y-2.5">
                                       {/* Subject & Lesson Badge */}
                                       <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                                        <span className={`text-[9.5px] font-mono font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 ${
-                                          bookSubject === "Mathematics" ? "bg-emerald-50 text-emerald-800 border-emerald-200" :
-                                          bookSubject === "Physics" ? "bg-sky-50 text-sky-800 border-sky-200" :
-                                          bookSubject === "Chemistry" ? "bg-amber-50 text-amber-800 border-amber-200" :
-                                          bookSubject === "Biology" ? "bg-teal-50 text-teal-800 border-teal-200" :
-                                          bookSubject === "Science" ? "bg-purple-50 text-purple-800 border-purple-200" :
-                                          "bg-slate-50 text-slate-800 border-slate-200"
-                                        }`}>
-                                          <span>{subjectIcon}</span>
+                                        <span className={`text-[9.5px] font-mono font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 ${theme.badgeBg}`}>
+                                          <span>{theme.icon}</span>
                                           <span>{bookSubject}</span>
                                         </span>
 
@@ -5405,12 +9563,15 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                       </div>
 
                                       {/* Title & Description */}
-                                      <h4 className="text-sm font-black text-[#0a3641] tracking-tight leading-snug line-clamp-2">
+                                      <h4 
+                                        onClick={() => setSelectedBookForReader(sess)}
+                                        className="text-sm font-black text-[#0a3641] tracking-tight leading-snug line-clamp-2 cursor-pointer hover:text-teal-700 transition-colors"
+                                      >
                                         {sess.processedTitle}
                                       </h4>
 
                                       <p className="text-[11px] text-zinc-500 line-clamp-3 font-sans leading-relaxed">
-                                        Interactive revision handbook equipped with AI flashcards, dynamic mind maps, and structured chapter summaries.
+                                        Interactive revision handbook equipped with AI flashcards, dynamic mind maps, chalkboard derivations, and structured chapter summaries.
                                       </p>
 
                                       {/* Metadata Badges */}
@@ -5426,8 +9587,18 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Action Buttons */}
+                                    {/* Action Buttons: Dual Quick Read & Smart Revision */}
                                     <div className="pt-3.5 border-t border-zinc-150 flex items-stretch sm:items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedBookForReader(sess)}
+                                        className="py-2.5 px-3.5 bg-white hover:bg-teal-50 text-teal-900 border border-teal-200 rounded-xl text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98]"
+                                        title="Open In-App Textbook & Formula Reader"
+                                      >
+                                        <BookOpen className="w-4 h-4 text-teal-700" />
+                                        <span>Quick Read</span>
+                                      </button>
+
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -5445,7 +9616,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                           handleGenerateRevisionDeck(sess);
                                         }}
                                         disabled={!hasContent}
-                                        className={`w-full py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
+                                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
                                           hasContent
                                             ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white active:scale-[0.98] shadow-amber-500/20 ring-1 ring-amber-400/40"
                                             : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
@@ -5453,7 +9624,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                         title={hasContent ? "Generate AI Flashcards & Mind Map for this lecture session" : "This session's board notes are empty"}
                                       >
                                         <Sparkles className="w-4 h-4 stroke-[2.5] text-amber-200 animate-pulse" />
-                                        <span>Launch Smart Revision (Flashcards & Mind Map)</span>
+                                        <span>Smart Revision Deck</span>
                                       </button>
                                     </div>
                                   </div>
@@ -5571,17 +9742,36 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                         </h3>
                       </div>
                       
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
+                        {/* Download Study Pack Notes */}
+                        <button
+                          onClick={handleExportStudyPack}
+                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-amber-300 hover:text-white px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                          title="Download Markdown Study Pack Notes with formulas and cards"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span className="hidden md:inline">Export Notes</span>
+                        </button>
+
+                        {/* Print / Save as PDF */}
+                        <button
+                          onClick={() => handleDownloadMindMap("pdf")}
+                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-teal-200 hover:text-white px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                          title="Print or Save PDF Revision Sheet"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span className="hidden md:inline">Print/PDF</span>
+                        </button>
+
                         {/* Sync Latest Session / Re-generate Button */}
                         <button
                           onClick={() => handleGenerateRevisionDeck(activeRevisionSession)}
                           disabled={loadingRevision}
-                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-teal-200 hover:text-white px-2.5 sm:px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-teal-200 hover:text-white px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
                           title="Re-sync latest classroom/document notes and re-generate deck"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${loadingRevision ? "animate-spin" : ""}`} />
-                          <span className="hidden sm:inline">Sync / Re-generate</span>
-                          <span className="sm:hidden">Sync</span>
+                          <span className="hidden sm:inline">Sync</span>
                         </button>
 
                         <button 
@@ -5597,2267 +9787,29 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                 })()}
 
                 {/* Interactive Study Progress Sub-banner with 3-tier active recall breakdown */}
-                {(() => {
-                  const totalCards = revisionDeckData.flashcards?.length || 0;
-                  const hardCount = Object.values(cardRatings).filter(r => r === "hard").length;
-                  const mediumCount = Object.values(cardRatings).filter(r => r === "medium").length;
-                  const easyCount = Object.values(cardRatings).filter(r => r === "easy").length;
-                  const masteredCount = Object.keys(masteredCards).filter(k => masteredCards[k]).length;
-                  const ratedCount = Object.keys(cardRatings).length;
-                  
-                  // Weighted revision score: Easy = 100%, Medium = 75%, Hard = 30%
-                  const weightedPoints = (easyCount * 100) + (mediumCount * 75) + (hardCount * 30);
-                  const maxPoints = totalCards * 100;
-                  const revisionScore = totalCards > 0 ? Math.round((weightedPoints / maxPoints) * 100) : 0;
-                  const masteryPercentage = totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0;
-
-                  return (
-                    <div className="bg-[#fefce8] border-b border-amber-200/50 px-4 py-2 sm:px-6 sm:py-2.5 shrink-0 flex items-center justify-between gap-3 text-left flex-wrap">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-[10px] sm:text-xs text-amber-950 font-bold truncate leading-none">
-                            <strong className="hidden sm:inline">Active Recall Session: </strong>
-                            <span>{ratedCount}/{totalCards} Cards Rated</span>
-                          </p>
-                          {ratedCount > 0 && (
-                            <div className="flex items-center gap-1 text-[9px] font-mono font-bold">
-                              {easyCount > 0 && (
-                                <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-300/40">
-                                  {easyCount} Easy
-                                </span>
-                              )}
-                              {mediumCount > 0 && (
-                                <span className="bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded border border-sky-300/40">
-                                  {mediumCount} Good
-                                </span>
-                              )}
-                              {hardCount > 0 && (
-                                <span className="bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded border border-rose-300/40">
-                                  {hardCount} Review
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
-                        <div className="text-right">
-                          <p className="text-[10px] sm:text-xs font-black text-amber-950 leading-none">
-                            Revision Score: <span className={revisionScore >= 80 ? "text-emerald-700 font-extrabold" : revisionScore >= 50 ? "text-amber-700 font-extrabold" : "text-rose-700 font-extrabold"}>{revisionScore}%</span>
-                          </p>
-                          <p className="text-[8.5px] font-mono text-amber-800/80 font-bold mt-0.5">
-                            {masteredCount}/{totalCards} Mastered ({masteryPercentage}%)
-                          </p>
-                        </div>
-                        <div className="w-16 sm:w-28 bg-amber-200/50 h-2 rounded-full overflow-hidden border border-amber-300/60 p-0.5 flex">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-500 shadow-xs ${
-                              revisionScore >= 80 ? "bg-emerald-500" : revisionScore >= 50 ? "bg-amber-500" : "bg-rose-500"
-                            }`}
-                            style={{ width: `${Math.max(revisionScore, 4)}%` }}
-                          />
-                        </div>
-                        {revisionScore >= 90 && totalCards > 0 && (
-                          <span className="bg-emerald-600 text-white text-[8px] sm:text-[9px] font-black tracking-wider uppercase py-0.5 px-2 rounded-md animate-bounce hidden xs:inline-block shadow-2xs">
-                            üèÜ Mastery Achieved!
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Sub-navigation & Layout Controllers with Hindi labels */}
-                <div className="bg-white border-b border-slate-200/50 px-3 py-1.5 sm:py-2.5 shrink-0 flex items-center justify-center">
-                  {/* Tab Swappers */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl sm:rounded-2xl w-full max-w-2xl border border-slate-200/40 shadow-2xs">
-                    <button
-                      onClick={() => setActiveRevisionTab("flashcards")}
-                      className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
-                        activeRevisionTab === "flashcards"
-                          ? "bg-teal-800 text-white shadow-md shadow-teal-900/20"
-                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
-                      }`}
-                    >
-                      <HelpCircle className="w-3.5 h-3.5" />
-                      <span>Interactive Cards</span>
-                      <span className="text-[8px] opacity-75 font-normal tracking-normal capitalize font-mono hidden xs:inline">
-                        (‡§´‡•ç‡§≤‡•à‡§∂‡§ï‡§æ‡§∞‡•ç‡§°‡•ç‡§∏)
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setActiveRevisionTab("mindmap")}
-                      className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
-                        activeRevisionTab === "mindmap"
-                          ? "bg-teal-800 text-white shadow-md shadow-teal-900/20"
-                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
-                      }`}
-                    >
-                      <Brain className="w-3.5 h-3.5" />
-                      <span>Concept Mind Map</span>
-                      <span className="text-[8px] opacity-75 font-normal tracking-normal capitalize font-mono hidden xs:inline">
-                        (‡§Æ‡§æ‡§á‡§Ç‡§° ‡§Æ‡•à‡§™)
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setActiveRevisionTab("summary")}
-                      className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
-                        activeRevisionTab === "summary"
-                          ? "bg-teal-800 text-white shadow-md shadow-teal-900/20"
-                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
-                      }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Topic Summary</span>
-                      <span className="text-[8px] opacity-75 font-normal tracking-normal capitalize font-mono hidden xs:inline">
-                        (‡§∏‡§æ‡§∞‡§æ‡§Ç‡§∂)
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Main Content Area */}
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-slate-50">
-                  
-                  {/* Left Column: Interactive Flashcards */}
-                  {activeRevisionTab === "flashcards" && (
-                    <div className="w-full max-w-6xl mx-auto p-4 sm:p-6 md:p-8 pb-24 sm:pb-8 flex flex-col justify-between overflow-y-auto min-h-0 bg-white flex-1 md:rounded-3xl md:shadow-md md:border md:border-slate-100/60 md:my-4">
-                      <div className="space-y-6 flex-1 flex flex-col justify-between">
-                        <div className="flex items-center justify-between shrink-0 flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-xs uppercase font-mono tracking-widest font-black text-slate-500 flex items-center gap-1.5">
-                              <HelpCircle className="w-4 h-4 text-teal-700" /> Interactive Flashcards
-                            </h4>
-                            {/* Keyboard guide tip */}
-                            <span className="hidden md:inline-flex items-center gap-1 text-[9px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">
-                              <kbd className="font-bold text-slate-600">Space</kbd> Flip ‚Ä¢ <kbd className="font-bold text-slate-600">1/2/3</kbd> Rate ‚Ä¢ <kbd className="font-bold text-slate-600">‚Üê/‚Üí</kbd> Navigate ‚Ä¢ <kbd className="font-bold text-slate-600">H</kbd> Hint
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={handleShuffleFlashcards}
-                              title="Shuffle flashcards order"
-                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 border border-slate-200/60 transition-all cursor-pointer shadow-2xs active:scale-95"
-                            >
-                              <Shuffle className="w-3 h-3" /> Shuffle
-                            </button>
-                            {Object.keys(masteredCards).length > 0 && (
-                              <button
-                                onClick={handleResetMastery}
-                                title="Reset mastery progress for this session"
-                                className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 border border-rose-200/60 transition-all cursor-pointer shadow-2xs active:scale-95"
-                              >
-                                <RefreshCw className="w-3 h-3" /> Reset
-                              </button>
-                            )}
-                            <span className="text-[10px] font-mono font-black tracking-widest text-slate-600 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-lg shadow-2xs">
-                              CARD {currentFlashcardIndex + 1} OF {revisionDeckData.flashcards?.length || 0}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Ruled index card & chalkboard flashcard animation */}
-                        {revisionDeckData.flashcards && revisionDeckData.flashcards.length > 0 ? (
-                          (() => {
-                            const totalCards = revisionDeckData.flashcards.length;
-                            const easyCount = Object.values(cardRatings).filter(r => r === "easy").length;
-                            const mediumCount = Object.values(cardRatings).filter(r => r === "medium").length;
-                            const hardCount = Object.values(cardRatings).filter(r => r === "hard").length;
-                            const ratedCount = easyCount + mediumCount + hardCount;
-                            const masteredCount = Object.values(masteredCards).filter(Boolean).length;
-                            const masteryPercentage = totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0;
-                            // Revision Score: Easy = 100%, Medium = 60%, Hard = 20%
-                            const totalEarnedPoints = (easyCount * 100) + (mediumCount * 60) + (hardCount * 20);
-                            const maxPossiblePoints = totalCards * 100;
-                            const revisionScorePercentage = maxPossiblePoints > 0 ? Math.round((totalEarnedPoints / maxPossiblePoints) * 100) : 0;
-
-                            const currentCard = revisionDeckData.flashcards[currentFlashcardIndex];
-                            const cardId = currentCard.id || String(currentFlashcardIndex);
-                            const currentRating = cardRatings[cardId];
-                            const isMastered = !!masteredCards[cardId];
-
-                            return (
-                              <div className="space-y-4 sm:space-y-6 flex-1 flex flex-col justify-center">
-                                {/* Real-time Session Revision Score & Active Recall Mastery Tracker */}
-                                <div className="w-full max-w-4xl mx-auto bg-slate-50 border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-2">
-                                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <div className="bg-[#0a3641] text-[#c4f500] px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1.5 shadow-2xs">
-                                        <Sparkles className="w-3.5 h-3.5 text-[#c4f500]" />
-                                        <span>REVISION SCORE: {revisionScorePercentage}%</span>
-                                      </div>
-                                      <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold tracking-wider flex items-center gap-1">
-                                        <span>üéØ Mastery: {masteryPercentage}% ({masteredCount}/{totalCards})</span>
-                                      </div>
-                                    </div>
-
-                                    {/* Rating Breakdown Badges */}
-                                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono font-bold flex-wrap">
-                                      <span className="bg-emerald-100/80 text-emerald-800 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        ‚úÖ Mastered: {easyCount}
-                                      </span>
-                                      <span className="bg-sky-100/80 text-sky-800 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        ‚ö° Medium: {mediumCount}
-                                      </span>
-                                      <span className="bg-rose-100/80 text-rose-800 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        ‚ùå Hard: {hardCount}
-                                      </span>
-                                      <span className="bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-md">
-                                        ‚ö™ Unrated: {Math.max(0, totalCards - ratedCount)}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Progress bar */}
-                                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
-                                    <div 
-                                      className="bg-emerald-500 transition-all duration-300"
-                                      style={{ width: `${totalCards > 0 ? (easyCount / totalCards) * 100 : 0}%` }}
-                                      title={`Mastered / Easy: ${easyCount}`}
-                                    />
-                                    <div 
-                                      className="bg-sky-500 transition-all duration-300"
-                                      style={{ width: `${totalCards > 0 ? (mediumCount / totalCards) * 100 : 0}%` }}
-                                      title={`Good / Medium: ${mediumCount}`}
-                                    />
-                                    <div 
-                                      className="bg-rose-500 transition-all duration-300"
-                                      style={{ width: `${totalCards > 0 ? (hardCount / totalCards) * 100 : 0}%` }}
-                                      title={`Confused / Hard: ${hardCount}`}
-                                    />
-                                  </div>
-                                </div>
-                                <div 
-                                  onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)}
-                                  className="w-full max-w-4xl mx-auto h-[22rem] sm:h-[28rem] md:h-[32rem] lg:h-[35rem] cursor-pointer [perspective:1000px] select-none relative group"
-                                >
-                                  <div className={`relative w-full h-full duration-500 [transform-style:preserve-3d] ${isFlashcardFlipped ? "[transform:rotateY(180deg)]" : ""}`}>
-                                    
-                                    {/* Card Front: Ruled school notebook style */}
-                                    <div className="absolute inset-0 w-full h-full bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 pb-4 sm:pb-6 flex flex-col justify-between shadow-md hover:shadow-lg hover:border-slate-300 transition-all [backface-visibility:hidden] overflow-hidden [background-image:linear-gradient(#f1f5f9_1px,transparent_1px)] [background-size:100%_2rem]">
-                                      {/* Mini clipboard metal clip */}
-                                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-20 h-4 bg-slate-200 rounded-b-md border-x border-b border-slate-300/80 z-20 shadow-2xs flex items-center justify-center">
-                                        <div className="w-10 h-1 bg-slate-400 rounded-full" />
-                                      </div>
-
-                                      {/* Pink margin index line */}
-                                      <div className="absolute left-10 sm:left-12 top-0 bottom-0 w-[1.5px] bg-rose-300/60" />
-
-                                      {/* Front Header Details */}
-                                      <div className="flex items-center justify-between z-10 pl-8 sm:pl-12 shrink-0 mt-2 gap-2">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="bg-teal-50 text-teal-800 border border-teal-100 text-[8.5px] font-mono font-black uppercase px-2.5 py-0.5 rounded-md tracking-wider flex items-center gap-1">
-                                            ‚ùì ACTIVE RECALL
-                                          </span>
-                                          {currentCard.difficulty && (
-                                            <span className={`text-[8px] font-mono font-black uppercase px-2 py-0.5 rounded-md border ${
-                                              currentCard.difficulty.toLowerCase() === 'easy'
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                : currentCard.difficulty.toLowerCase() === 'hard'
-                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                                            }`}>
-                                              {currentCard.difficulty}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-                                          {/* Instant "Discuss with Cherry Ma'am" Action Button */}
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDiscussWithCherry(currentCard);
-                                            }}
-                                            className="bg-gradient-to-r from-[#0a3641] to-[#124e5d] hover:from-[#0d4756] hover:to-[#1a6577] text-[#c4f500] hover:text-white border border-[#0a3641]/30 hover:border-[#c4f500]/50 text-[8.5px] sm:text-[9.5px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-lg tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 z-30"
-                                            title="Open Live Classroom & discuss this concept with Cherry Ma'am"
-                                          >
-                                            <span className="text-xs">üéôÔ∏è</span>
-                                            <span className="font-bold whitespace-nowrap">Discuss with Cherry Ma'am</span>
-                                            <Sparkles className="w-3 h-3 text-[#c4f500] animate-pulse shrink-0 hidden sm:inline" />
-                                          </button>
-
-                                          {currentRating ? (
-                                            <span className={`text-[8px] font-mono font-black uppercase px-2 py-0.5 rounded-full tracking-wider border flex items-center gap-1 ${
-                                              currentRating === "easy"
-                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                : currentRating === "medium"
-                                                ? "bg-sky-50 text-sky-700 border-sky-200"
-                                                : "bg-rose-50 text-rose-700 border-rose-200"
-                                            }`}>
-                                              {currentRating === "easy" ? "‚úÖ MASTERED / EASY" : currentRating === "medium" ? "‚ö° GOOD / MEDIUM" : "‚ùå REVIEW / HARD"}
-                                            </span>
-                                          ) : isMastered ? (
-                                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[8px] font-mono font-black uppercase px-2 py-0.5 rounded-full tracking-wider">
-                                              ‚úì MASTERED
-                                            </span>
-                                          ) : (
-                                            <span className="bg-slate-100 text-slate-500 border border-slate-200 text-[8px] font-mono font-bold uppercase px-2 py-0.5 rounded-full tracking-wider">
-                                              UNRATED
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* Question Body with LaTeX math rendering */}
-                                      <div className="text-center my-auto py-2 z-10 pl-8 sm:pl-12 overflow-y-auto max-h-[70%] scrollbar-none">
-                                        <div className="bg-amber-100/60 text-amber-900 border border-amber-200/30 text-[9.5px] sm:text-[11px] font-mono font-black uppercase px-2.5 py-1 rounded-md tracking-wider inline-block mb-3 sm:mb-4">
-                                          Concept: {currentCard.conceptTested || "General Review"}
-                                        </div>
-                                        <div className="text-base sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-800 leading-snug tracking-tight px-2 sm:px-6">
-                                          {renderTextWithKaTeX(currentCard.question)}
-                                        </div>
-
-                                        {/* Optional Socratic Hint Box */}
-                                        {currentCard.hint && (
-                                          <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                              onClick={() => setShowFlashcardHint(!showFlashcardHint)}
-                                              className="text-[10px] sm:text-xs font-mono font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300/60 px-3 py-1 rounded-lg inline-flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                                            >
-                                              <Lightbulb className={`w-3.5 h-3.5 ${showFlashcardHint ? "text-amber-600 fill-amber-400" : "text-amber-500"}`} />
-                                              {showFlashcardHint ? "Hide Cherry Ma'am's Hint" : "üí° Need a Hint? (Press H)"}
-                                            </button>
-                                            {showFlashcardHint && (
-                                              <div className="mt-2.5 p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-left text-xs sm:text-sm text-amber-950 font-medium max-w-lg mx-auto shadow-2xs animate-in fade-in duration-200">
-                                                <span className="font-bold text-amber-900 flex items-center gap-1 mb-1">
-                                                  üß† Thought Trigger:
-                                                </span>
-                                                {renderTextWithKaTeX(currentCard.hint)}
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Bottom indicator */}
-                                      <div className="text-center pt-2 border-t border-dashed border-slate-100 z-10 pl-8 sm:pl-12 shrink-0">
-                                        <p className="text-[10px] sm:text-xs font-bold text-[#4c8491] animate-pulse flex items-center justify-center gap-1.5">
-                                          <RefreshCw className="w-3.5 h-3.5 animate-spin-slow text-teal-600" /> Tap card or Press Space to flip & reveal answer
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    {/* Card Back: Slate Chalkboard style */}
-                                    <div className="absolute inset-0 w-full h-full bg-[#0d2220] text-white rounded-2xl p-6 sm:p-8 pb-4 sm:pb-6 flex flex-col justify-between shadow-2xl [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden">
-                                      {/* Realistic blackboard wooden frame shadow border */}
-                                      <div className="absolute inset-0 border-[8px] border-[#8b5a2b] rounded-2xl pointer-events-none z-20 shadow-inner" />
-                                      {/* Inner chalkboard chalk line border */}
-                                      <div className="absolute inset-2.5 border border-dashed border-teal-500/20 rounded-lg pointer-events-none z-10" />
-
-                                      {/* Back Header */}
-                                      <div className="flex items-center justify-between z-10 shrink-0 px-4 mt-2 gap-2">
-                                        <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[9.5px] sm:text-[11px] font-mono font-black uppercase px-2.5 py-1 rounded-md tracking-wider">
-                                          CHERRY MA'AM'S LESSON ANSWER
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                          {/* Instant "Discuss with Cherry Ma'am" Action Button */}
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDiscussWithCherry(currentCard);
-                                            }}
-                                            className="bg-[#c4f500] hover:bg-[#d4ff33] text-[#0a3641] font-black text-[8.5px] sm:text-[9.5px] font-mono uppercase px-2.5 py-1 rounded-lg tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 z-30"
-                                            title="Open Live Classroom & discuss this concept with Cherry Ma'am"
-                                          >
-                                            <span>üéôÔ∏è Discuss with Cherry Ma'am</span>
-                                            <Sparkles className="w-3 h-3 text-[#0a3641] shrink-0 hidden sm:inline" />
-                                          </button>
-                                          <span className="text-[9px] sm:text-[10px] font-mono text-emerald-300/80 hidden md:inline">
-                                            Double-tap to flip back
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Answer content (Scrollable if too long) */}
-                                      <div className="text-left my-auto py-4 px-4 overflow-y-auto max-h-[70%] scrollbar-thin scrollbar-thumb-amber-400/20 scrollbar-track-transparent pr-1 z-10">
-                                        <div className="text-sm sm:text-base md:text-lg lg:text-xl font-extrabold text-teal-50 leading-relaxed space-y-3">
-                                          {renderTextWithKaTeX(currentCard.answer)}
-                                        </div>
-                                      </div>
-
-                                      {/* 3-Tier Active Recall Rating Buttons on Card Back */}
-                                      <div 
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="pt-3 sm:pt-4 border-t border-dashed border-[#1c4e49] shrink-0 z-30 px-2 sm:px-4"
-                                      >
-                                        <p className="text-[10px] sm:text-xs font-mono font-bold text-amber-200/90 text-center mb-2.5 flex items-center justify-center gap-1">
-                                          <span>ü§î How well did you know this concept?</span>
-                                        </p>
-
-                                        <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-xl mx-auto">
-                                          {/* Confused / Hard button */}
-                                          <button
-                                            onClick={() => handleRateCard(cardId, "hard")}
-                                            className={`py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer border active:scale-95 shadow-2xs ${
-                                              currentRating === "hard"
-                                                ? "bg-rose-600 text-white border-rose-400 ring-2 ring-rose-400/40"
-                                                : "bg-rose-950/40 hover:bg-rose-900/60 text-rose-200 border-rose-700/50"
-                                            }`}
-                                            title="Need to review again soon (Hotkey: 1)"
-                                          >
-                                            <span className="text-sm">‚ùå</span>
-                                            <span className="truncate">Confused / Hard</span>
-                                            <span className="text-[8.5px] opacity-75 font-mono hidden md:inline">(1)</span>
-                                          </button>
-
-                                          {/* Good / Medium button */}
-                                          <button
-                                            onClick={() => handleRateCard(cardId, "medium")}
-                                            className={`py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer border active:scale-95 shadow-2xs ${
-                                              currentRating === "medium"
-                                                ? "bg-sky-600 text-white border-sky-400 ring-2 ring-sky-400/40"
-                                                : "bg-sky-950/40 hover:bg-sky-900/60 text-sky-200 border-sky-700/50"
-                                            }`}
-                                            title="Good recall with slight effort (Hotkey: 2)"
-                                          >
-                                            <span className="text-sm">‚ö°</span>
-                                            <span className="truncate">Good / Medium</span>
-                                            <span className="text-[8.5px] opacity-75 font-mono hidden md:inline">(2)</span>
-                                          </button>
-
-                                          {/* Mastered / Easy button */}
-                                          <button
-                                            onClick={() => handleRateCard(cardId, "easy")}
-                                            className={`py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer border active:scale-95 shadow-2xs ${
-                                              currentRating === "easy"
-                                                ? "bg-emerald-600 text-white border-emerald-400 ring-2 ring-emerald-400/40"
-                                                : "bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-200 border-emerald-700/50"
-                                            }`}
-                                            title="Crystal clear & mastered completely (Hotkey: 3)"
-                                          >
-                                            <span className="text-sm">‚úÖ</span>
-                                            <span className="truncate">Mastered / Easy</span>
-                                            <span className="text-[8.5px] opacity-75 font-mono hidden md:inline">(3)</span>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                  </div>
-                                </div>
-
-                                {/* Tactile Navigation Controls */}
-                                <div className="flex items-center justify-between pt-4 max-w-4xl mx-auto w-full shrink-0">
-                                  <button
-                                    disabled={currentFlashcardIndex === 0}
-                                    onClick={() => {
-                                      setCurrentFlashcardIndex(prev => prev - 1);
-                                      setIsFlashcardFlipped(false);
-                                      setShowFlashcardHint(false);
-                                    }}
-                                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                                  >
-                                    <ChevronLeft className="w-4 h-4 stroke-[3]" /> Prev
-                                  </button>
-
-                                  <button
-                                    onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)}
-                                    className="px-6 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
-                                  >
-                                    <RefreshCw className="w-4 h-4" /> Flip Card
-                                  </button>
-
-                                  <button
-                                    disabled={currentFlashcardIndex === totalCards - 1}
-                                    onClick={() => {
-                                      setCurrentFlashcardIndex(prev => prev + 1);
-                                      setIsFlashcardFlipped(false);
-                                      setShowFlashcardHint(false);
-                                    }}
-                                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                                  >
-                                    Next <ChevronRight className="w-4 h-4 stroke-[3]" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          <div className="bg-white border rounded-2xl p-12 text-center text-slate-400 text-xs shadow-2xs flex-1 flex items-center justify-center">
-                            No flashcards available.
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="pt-4 border-t border-slate-200 mt-6 text-center shrink-0">
-                        <p className="text-[9.5px] font-mono text-slate-400 font-black tracking-wider uppercase">
-                          Active recall helps translate whiteboard explanations into exam success.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeRevisionTab === "mindmap" && (
-                    <div className="w-full max-w-4xl mx-auto p-3 sm:p-5 md:p-6 flex flex-col overflow-hidden min-h-0 bg-white flex-1 md:rounded-3xl md:shadow-md md:border md:border-slate-100/60 md:my-4">
-                      {/* Top Action Header */}
-                      {(() => {
-                        const sourceBadge = getSourceBadgeInfo(activeRevisionSession);
-                        return (
-                          <div className="border-b border-slate-150 pb-3 mb-4 shrink-0 flex flex-col text-left">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                              <div className="flex flex-col space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="text-xs uppercase font-mono tracking-widest font-black text-slate-500 flex items-center gap-1.5">
-                                    <Brain className="w-4 h-4 text-teal-800 animate-pulse" /> CONCEPT RECALL MIND MAP
-                                  </h4>
-                                  {/* Smart Source Badge */}
-                                  <span 
-                                    className="inline-flex items-center gap-1 text-[9px] font-mono font-extrabold px-2 py-0.5 rounded-full border shadow-2xs bg-emerald-50 text-emerald-800 border-emerald-300"
-                                    title={sourceBadge.description}
-                                  >
-                                    <span>{sourceBadge.icon}</span>
-                                    <span>{sourceBadge.label}</span>
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-800 font-black tracking-wide uppercase">
-                                  {activeRevisionSession.processedTitle || revisionDeckData.mindMap?.title || "Classroom Conceptual Flow Diagram"}
-                                </p>
-                              </div>
-
-                              <button
-                                onClick={() => handleGenerateRevisionDeck(activeRevisionSession)}
-                                disabled={loadingRevision}
-                                className="self-start sm:self-auto px-3 py-1.5 bg-gradient-to-r from-teal-700 to-teal-800 hover:from-teal-800 hover:to-teal-900 text-white rounded-xl text-[10.5px] font-mono font-black flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                                title="Fetch freshest classroom blackboard notes and rebuild mind map"
-                              >
-                                <RefreshCw className={`w-3 h-3 ${loadingRevision ? "animate-spin" : ""}`} />
-                                <span>Sync / Re-generate</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* MODE 1: INTERACTIVE MAP GRAPH VIEW */}
-                      <div className="flex-1 flex flex-col overflow-hidden min-h-0 text-left animate-fade-in">
-                          
-                          {/* Instructions Header with Fullscreen & Download Trigger */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 bg-teal-50/50 border border-teal-100/30 px-3.5 py-2 rounded-xl shrink-0">
-                            <p className="text-[10.5px] text-teal-900 font-bold flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping shrink-0" />
-                              <span>Tap any node branch to review details instantly.</span>
-                            </p>
-                            
-                            <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
-                              {/* Download PNG Button */}
-                              <button
-                                onClick={() => handleDownloadMindMap("png")}
-                                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[9.5px] font-mono font-black rounded-lg shadow-xs flex items-center gap-1 transition-all cursor-pointer hover:scale-102 active:scale-95"
-                                title="Download Mind Map as Image (PNG)"
-                              >
-                                <Download className="w-3 h-3" /> PNG
-                              </button>
-
-                              {/* Download SVG Button */}
-                              <button
-                                onClick={() => handleDownloadMindMap("svg")}
-                                className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white text-[9.5px] font-mono font-black rounded-lg shadow-xs flex items-center gap-1 transition-all cursor-pointer hover:scale-102 active:scale-95"
-                                title="Download Mind Map as Vector Graphic (SVG)"
-                              >
-                                <HardDriveDownload className="w-3 h-3" /> SVG
-                              </button>
-
-                              {/* Download PDF Button */}
-                              <button
-                                onClick={() => handleDownloadMindMap("pdf")}
-                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[9.5px] font-mono font-black rounded-lg shadow-xs flex items-center gap-1 transition-all cursor-pointer hover:scale-102 active:scale-95"
-                                title="Print / Export Mind Map as PDF"
-                              >
-                                <Printer className="w-3 h-3" /> PDF
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setIsMapFullscreen(true);
-                                  if (lastSelectedNodeId === null) {
-                                    setLastSelectedNodeId(0);
-                                    setExpandedNodes({ 0: true });
-                                  }
-                                }}
-                                className="px-2.5 py-1 bg-teal-800 hover:bg-teal-950 text-white text-[9.5px] font-mono font-black rounded-lg shadow-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-102"
-                              >
-                                <Maximize2 className="w-3 h-3" /> FULLSCREEN
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Map Slate Container */}
-                          <div 
-                            onClick={() => setSelectedSubNode(null)}
-                            className={`border-2 rounded-2xl p-2 sm:p-4 mb-4 relative overflow-visible select-none shrink-0 transition-all duration-300 ${
-                              mindMapStyle === "pastel" 
-                                ? "bg-[#FAF6F0] border-[#e5dcd0] shadow-[inset_0_2px_8px_rgba(0,0,0,0.01)]" 
-                                : "bg-[#051e22] border-teal-950/40 shadow-inner"
-                            }`}
-                          >
-                            {/* Backdrop grid elements */}
-                            <div 
-                              className={`absolute inset-0 [background-size:16px_16px] pointer-events-none transition-all duration-300 ${
-                                mindMapStyle === "pastel"
-                                  ? "bg-[radial-gradient(#e5dcd0_1.2px,transparent_1.2px)] opacity-60"
-                                  : "bg-[radial-gradient(#1e3b3a_1px,transparent_1px)] opacity-20"
-                              }`} 
-                            />
-                            
-                            <svg 
-                              id="mindmap-svg"
-                              viewBox="0 0 800 420" 
-                              width="100%" 
-                              className="w-full h-auto max-h-[220px] sm:max-h-[300px] md:max-h-[380px] select-none overflow-visible"
-                            >
-                              <defs>
-                                <filter id="glow-selected" x="-20%" y="-20%" width="140%" height="140%">
-                                  <feGaussianBlur stdDeviation="4" result="blur" />
-                                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                                </filter>
-                                <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-                                  <feDropShadow 
-                                    dx="0" 
-                                    dy={mindMapStyle === "pastel" ? "3" : "4"} 
-                                    stdDeviation={mindMapStyle === "pastel" ? "2" : "3"} 
-                                    floodOpacity={mindMapStyle === "pastel" ? "0.08" : "0.4"} 
-                                  />
-                                </filter>
-                                <linearGradient id="centerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                  <stop offset="0%" stopColor={mindMapStyle === "pastel" ? "#b4a4eb" : "#1e5156"} />
-                                  <stop offset="100%" stopColor={mindMapStyle === "pastel" ? "#9f86f0" : "#0a2c30"} />
-                                </linearGradient>
-                                <linearGradient id="selectedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                  <stop offset="0%" stopColor="#0d9488" />
-                                  <stop offset="100%" stopColor="#0f766e" />
-                                </linearGradient>
-                                <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                  <stop offset="0%" stopColor="#115e59" />
-                                  <stop offset="100%" stopColor="#134e4a" />
-                                </linearGradient>
-                                <marker 
-                                  id="arrow-head" 
-                                  viewBox="0 0 10 10" 
-                                  refX="8" 
-                                  refY="5" 
-                                  markerWidth="5" 
-                                  markerHeight="5" 
-                                  orient="auto-start-reverse"
-                                >
-                                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill={mindMapStyle === "pastel" ? "#4b5563" : "#2dd4bf"} />
-                                </marker>
-                              </defs>
-
-                              {/* 1. Connecting curves from center (400, 210) to nodes */}
-                              {(() => {
-                                const nodes = revisionDeckData.mindMap?.nodes || [];
-                                const N = nodes.length || 1;
-                                const center = { x: 400, y: 210 };
-                                const rx = 245;
-                                const ry = 135;
-
-                                return nodes.map((node: any, index: number) => {
-                                  const angle = (2 * Math.PI * index) / N - Math.PI / 2;
-                                  const targetX = center.x + rx * Math.cos(angle);
-                                  const targetY = center.y + ry * Math.sin(angle);
-
-                                  const isSelected = lastSelectedNodeId === index;
-                                  const isMatched = (() => {
-                                    if (!mindMapSearch.trim()) return false;
-                                    const queryText = mindMapSearch.toLowerCase();
-                                    return (
-                                      node.topicName?.toLowerCase().includes(queryText) ||
-                                      node.keyFormula?.toLowerCase().includes(queryText) ||
-                                      (node.keyConcepts || node.coreConcepts || []).some((c: string) => c.toLowerCase().includes(queryText))
-                                    );
-                                  })();
-
-                                  const cx1 = center.x + (targetX - center.x) * 0.45;
-                                  const cy1 = center.y;
-                                  const cx2 = center.x + (targetX - center.x) * 0.55;
-                                  const cy2 = targetY;
-
-                                  const pathD = `M ${center.x} ${center.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${targetX} ${targetY}`;
-                                  const pTheme = getPastelTheme(index);
-
-                                  return (
-                                    <g key={`path-${index}`} className="pointer-events-none">
-                                      {isSelected && (
-                                        <path 
-                                          d={pathD} 
-                                          fill="none" 
-                                          stroke={mindMapStyle === "pastel" ? pTheme.stroke : "#fbbf24"} 
-                                          strokeWidth="7" 
-                                          opacity={mindMapStyle === "pastel" ? "0.15" : "0.35"} 
-                                          strokeLinecap="round"
-                                          className="animate-pulse"
-                                        />
-                                      )}
-                                      <path 
-                                        d={pathD} 
-                                        fill="none" 
-                                        stroke={
-                                          mindMapStyle === "pastel"
-                                            ? (isSelected ? pTheme.stroke : isMatched ? "#10b981" : "#4b5563")
-                                            : (isSelected ? "#fbbf24" : isMatched ? "#2dd4bf" : "#114c47")
-                                        } 
-                                        strokeWidth={isSelected ? "2.5" : isMatched ? "2" : "1.5"} 
-                                        strokeDasharray={
-                                          mindMapStyle === "pastel" 
-                                            ? "none" 
-                                            : (isMatched || isSelected ? "none" : "5 4")
-                                        }
-                                        markerEnd={mindMapStyle === "pastel" ? "url(#arrow-head)" : undefined}
-                                        className="transition-all duration-300"
-                                        strokeLinecap="round"
-                                      />
-                                      {isSelected && (
-                                        <circle 
-                                          cx={targetX} 
-                                          cy={targetY} 
-                                          r="12" 
-                                          fill="none" 
-                                          stroke={mindMapStyle === "pastel" ? pTheme.stroke : "#fbbf24"} 
-                                          strokeWidth="1.5" 
-                                          className="animate-ping" 
-                                          opacity="0.6"
-                                        />
-                                      )}
-                                    </g>
-                                  );
-                                });
-                              })()}
-
-                              {/* 2. Central Hub Bubble */}
-                              {(() => {
-                                const sourceBadge = getSourceBadgeInfo(activeRevisionSession);
-                                const rawTitle = activeRevisionSession.processedTitle || revisionDeckData.mindMap?.title || "Core Concept Hub";
-                                const maxChar = 22;
-                                
-                                return (
-                                  <g filter="url(#shadow)" className="cursor-pointer" onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLastSelectedNodeId(0);
-                                    setExpandedNodes({ 0: true });
-                                    setSelectedSubNode(null);
-                                  }}>
-                                    <rect 
-                                      x="270" 
-                                      y="166" 
-                                      width="260" 
-                                      height="88" 
-                                      rx="22" 
-                                      ry="22" 
-                                      fill="url(#centerGrad)" 
-                                      stroke={mindMapStyle === "pastel" ? "#7c3aed" : "#0d9488"} 
-                                      strokeWidth="2.5" 
-                                      className="hover:stroke-teal-400 transition-all duration-300 active:scale-98"
-                                    />
-                                    {/* Source Tag Bubble on Top */}
-                                    <rect 
-                                      x="320" 
-                                      y="154" 
-                                      width="160" 
-                                      height="22" 
-                                      rx="7" 
-                                      ry="7" 
-                                      fill={mindMapStyle === "pastel" ? "#ffca28" : "#f59e0b"} 
-                                    />
-                                    <text 
-                                      x="400" 
-                                      y="168" 
-                                      textAnchor="middle" 
-                                      fill={mindMapStyle === "pastel" ? "#3e2723" : "#0f172a"} 
-                                      fontSize="8.5" 
-                                      fontWeight="900" 
-                                      letterSpacing="0.8"
-                                      className="font-mono uppercase select-none"
-                                    >
-                                      {sourceBadge.shortLabel}
-                                    </text>
-
-                                    {/* Prominently render Chapter / Document Name */}
-                                    {(() => {
-                                      if (rawTitle.length <= maxChar) {
-                                        return (
-                                          <text 
-                                            x="400" 
-                                            y="204" 
-                                            textAnchor="middle" 
-                                            fill="#ffffff" 
-                                            fontSize="12.5" 
-                                            fontWeight="900" 
-                                            className="font-sans tracking-wide uppercase select-none"
-                                          >
-                                            {rawTitle}
-                                          </text>
-                                        );
-                                      }
-                                      const words = rawTitle.split(" ");
-                                      let line1 = "";
-                                      let line2 = "";
-                                      for (const w of words) {
-                                        if ((line1 + " " + w).trim().length <= maxChar && line2 === "") {
-                                          line1 = (line1 + " " + w).trim();
-                                        } else {
-                                          line2 = (line2 + " " + w).trim();
-                                        }
-                                      }
-                                      if (line2.length > maxChar) line2 = line2.slice(0, maxChar - 2) + "...";
-                                      return (
-                                        <g>
-                                          <text 
-                                            x="400" 
-                                            y="197" 
-                                            textAnchor="middle" 
-                                            fill="#ffffff" 
-                                            fontSize="11.5" 
-                                            fontWeight="900" 
-                                            className="font-sans tracking-wide uppercase select-none"
-                                          >
-                                            {line1 || rawTitle.slice(0, maxChar)}
-                                          </text>
-                                          <text 
-                                            x="400" 
-                                            y="214" 
-                                            textAnchor="middle" 
-                                            fill="#ffffff" 
-                                            fontSize="11" 
-                                            fontWeight="800" 
-                                            className="font-sans tracking-wide uppercase select-none"
-                                          >
-                                            {line2}
-                                          </text>
-                                        </g>
-                                      );
-                                    })()}
-
-                                    <text 
-                                      x="400" 
-                                      y="238" 
-                                      textAnchor="middle" 
-                                      fill={mindMapStyle === "pastel" ? "#fdfaf6" : "#99f6e4"} 
-                                      fontSize="9" 
-                                      fontWeight="700" 
-                                      className="font-mono uppercase tracking-widest select-none opacity-95"
-                                    >
-                                      {activeRevisionSession.subject || subject} ‚Ä¢ CLASS {grade}
-                                    </text>
-                                  </g>
-                                );
-                              })()}
-
-                              {/* 3. Branch Concept Capsules */}
-                              {(() => {
-                                const nodes = revisionDeckData.mindMap?.nodes || [];
-                                const N = nodes.length || 1;
-                                const center = { x: 400, y: 210 };
-                                const rx = 245;
-                                const ry = 135;
-
-                                return nodes.map((node: any, index: number) => {
-                                  const angle = (2 * Math.PI * index) / N - Math.PI / 2;
-                                  const targetX = center.x + rx * Math.cos(angle);
-                                  const targetY = center.y + ry * Math.sin(angle);
-
-                                  const isSelected = lastSelectedNodeId === index;
-                                  const isMatched = (() => {
-                                    if (!mindMapSearch.trim()) return false;
-                                    const queryText = mindMapSearch.toLowerCase();
-                                    return (
-                                      node.topicName?.toLowerCase().includes(queryText) ||
-                                      node.keyFormula?.toLowerCase().includes(queryText) ||
-                                      (node.keyConcepts || node.coreConcepts || []).some((c: string) => c.toLowerCase().includes(queryText))
-                                    );
-                                  })();
-
-                                  const capW = 164;
-                                  const capH = 48;
-                                  const capX = targetX - capW / 2;
-                                  const capY = targetY - capH / 2;
-
-                                  const maxLen = 18;
-                                  const rawName = node.topicName || "General Topic";
-                                  const dispName = rawName.length > maxLen ? rawName.slice(0, maxLen - 2) + "..." : rawName;
-                                  const pTheme = getPastelTheme(index);
-
-                                  return (
-                                    <g 
-                                      key={`node-${index}`} 
-                                      filter="url(#shadow)" 
-                                      className="cursor-pointer group select-none"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setLastSelectedNodeId(index);
-                                        setExpandedNodes({ [index]: true });
-                                        setSelectedSubNode(null);
-                                      }}
-                                    >
-                                      {/* Outer border highlight */}
-                                      <rect 
-                                        x={capX - (isSelected ? 3 : 1)} 
-                                        y={capY - (isSelected ? 3 : 1)} 
-                                        width={capW + (isSelected ? 6 : 2)} 
-                                        height={capH + (isSelected ? 6 : 2)} 
-                                        rx="14" 
-                                        ry="14" 
-                                        fill="none" 
-                                        stroke={
-                                          mindMapStyle === "pastel"
-                                            ? (isSelected ? pTheme.stroke : isMatched ? "#10b981" : "transparent")
-                                            : (isSelected ? "#fbbf24" : isMatched ? "#2dd4bf" : "transparent")
-                                        } 
-                                        strokeWidth={isSelected ? "3" : isMatched ? "2" : "0"} 
-                                        opacity={isSelected ? "1" : isMatched ? "0.85" : "0"}
-                                        className="transition-all duration-300"
-                                      />
-
-                                      {/* Core node capsule */}
-                                      <rect 
-                                        x={capX} 
-                                        y={capY} 
-                                        width={capW} 
-                                        height={capH} 
-                                        rx="12" 
-                                        ry="12" 
-                                        fill={
-                                          mindMapStyle === "pastel"
-                                            ? pTheme.fill
-                                            : (isSelected ? "url(#selectedGrad)" : "url(#nodeGrad)")
-                                        } 
-                                        stroke={
-                                          mindMapStyle === "pastel"
-                                            ? (isSelected ? "#7c3aed" : isMatched ? "#059669" : pTheme.stroke)
-                                            : (isSelected ? "#f59e0b" : isMatched ? "#0f766e" : "#0d3c38")
-                                        } 
-                                        strokeWidth={mindMapStyle === "pastel" ? "1.8" : "1.5"} 
-                                        className="transition-all duration-300 group-hover:stroke-teal-400 group-active:scale-98"
-                                      />
-
-                                      {/* Index Circle Indicator */}
-                                      <circle 
-                                        cx={capX + 16} 
-                                        cy={targetY} 
-                                        r="8.5" 
-                                        fill={
-                                          mindMapStyle === "pastel"
-                                            ? pTheme.stroke
-                                            : (isSelected ? "#115e59" : "#0d3d39")
-                                        } 
-                                        stroke={
-                                          mindMapStyle === "pastel"
-                                            ? pTheme.text
-                                            : (isSelected ? "#fbbf24" : "#0d9488")
-                                        }
-                                        strokeWidth="1"
-                                      />
-                                      <text 
-                                        x={capX + 16} 
-                                        y={targetY + 3} 
-                                        textAnchor="middle" 
-                                        fill={
-                                          mindMapStyle === "pastel"
-                                            ? "#ffffff"
-                                            : (isSelected ? "#fbbf24" : "#2dd4bf")
-                                        } 
-                                        fontSize="8" 
-                                        fontWeight="900" 
-                                        className="font-mono select-none"
-                                      >
-                                        {index + 1}
-                                      </text>
-
-                                      {/* Main Text Label */}
-                                      <text 
-                                        x={capX + 32} 
-                                        y={targetY + 3} 
-                                        fill={mindMapStyle === "pastel" ? pTheme.text : "#ffffff"} 
-                                        fontSize="9.5" 
-                                        fontWeight="900" 
-                                        className="font-sans uppercase tracking-wide select-none group-hover:opacity-80 transition-colors"
-                                      >
-                                        {dispName}
-                                      </text>
-
-                                      {/* Mini Item Counter badge */}
-                                      <g transform={`translate(${capX + capW - 24}, ${targetY - 6.5})`}>
-                                        <rect 
-                                          width="16" 
-                                          height="13" 
-                                          rx="4" 
-                                          ry="4" 
-                                          fill={
-                                            mindMapStyle === "pastel"
-                                              ? pTheme.stroke
-                                              : (isSelected ? "#0d534f" : "#114c47")
-                                          } 
-                                          opacity={mindMapStyle === "pastel" ? "0.15" : "1"}
-                                        />
-                                        <text 
-                                          x="8" 
-                                          y="9" 
-                                          textAnchor="middle" 
-                                          fill={mindMapStyle === "pastel" ? pTheme.text : "#ffffff"} 
-                                          fontSize="7.5" 
-                                          fontWeight="bold" 
-                                          className="font-mono"
-                                        >
-                                          {getSubItems(node).length}
-                                        </text>
-                                      </g>
-                                    </g>
-                                  );
-                                });
-                              })()}
-
-                              {/* 4. Sub-branch nodes for the selected parent node */}
-                              {(() => {
-                                if (lastSelectedNodeId === null) return null;
-                                const parentNode = revisionDeckData.mindMap?.nodes?.[lastSelectedNodeId];
-                                if (!parentNode) return null;
-
-                                const nodes = revisionDeckData.mindMap?.nodes || [];
-                                const N = nodes.length || 1;
-                                const center = { x: 400, y: 210 };
-                                const rx = 245;
-                                const ry = 135;
-
-                                const angle = (2 * Math.PI * lastSelectedNodeId) / N - Math.PI / 2;
-                                const targetX = center.x + rx * Math.cos(angle);
-                                const targetY = center.y + ry * Math.sin(angle);
-
-                                const subItems = getSubItems(parentNode);
-                                const K = subItems.length;
-                                if (K === 0) return null;
-
-                                const spread = K <= 1 ? 0 : Math.min(Math.PI * 0.75, (K - 1) * 0.38);
-                                const startAngle = angle - spread / 2;
-
-                                const pTheme = getPastelTheme(lastSelectedNodeId);
-                                const subTheme = getSubNodePastelTheme(lastSelectedNodeId);
-
-                                return subItems.map((subItem: any, i: number) => {
-                                  const subAngle = K <= 1 ? angle : startAngle + (i * spread) / (K - 1);
-                                  const subDist = 80;
-                                  const subX = targetX + subDist * Math.cos(subAngle);
-                                  const subY = targetY + subDist * Math.sin(subAngle);
-
-                                  const subW = 114;
-                                  const subH = 28;
-                                  const subX_rect = subX - subW / 2;
-                                  const subY_rect = subY - subH / 2;
-
-                                  const isSubSelected = selectedSubNode?.nodeId === lastSelectedNodeId && selectedSubNode?.subIdx === i;
-
-                                  return (
-                                    <g 
-                                      key={`sub-${lastSelectedNodeId}-${i}`}
-                                      className="cursor-pointer group select-none animate-fade-in"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedSubNode({ nodeId: lastSelectedNodeId, subIdx: i });
-                                      }}
-                                    >
-                                      {/* Connector Line */}
-                                      <line
-                                        x1={targetX}
-                                        y1={targetY}
-                                        x2={subX}
-                                        y2={subY}
-                                        stroke={
-                                          mindMapStyle === "pastel"
-                                            ? pTheme.stroke
-                                            : (isSubSelected ? "#fbbf24" : "#2dd4bf")
-                                        }
-                                        strokeWidth={
-                                          mindMapStyle === "pastel"
-                                            ? "1.5"
-                                            : (isSubSelected ? "2" : "1.2")
-                                        }
-                                        strokeDasharray={
-                                          mindMapStyle === "pastel"
-                                            ? "none"
-                                            : (isSubSelected ? "none" : "3 2")
-                                        }
-                                        markerEnd={mindMapStyle === "pastel" ? "url(#arrow-head)" : undefined}
-                                        opacity="0.8"
-                                      />
-                                      
-                                      {/* Sub-node bubble */}
-                                      <rect
-                                        x={subX_rect}
-                                        y={subY_rect}
-                                        width={subW}
-                                        height={subH}
-                                        rx="8"
-                                        ry="8"
-                                        fill={
-                                          mindMapStyle === "pastel"
-                                            ? (isSubSelected ? "#ffca28" : subTheme.fill)
-                                            : (isSubSelected ? "#fbbf24" : "#0f3a40")
-                                        }
-                                        stroke={
-                                          mindMapStyle === "pastel"
-                                            ? (isSubSelected ? "#d97706" : subTheme.stroke)
-                                            : (isSubSelected ? "#d97706" : subItem.type === "formula" ? "#f59e0b" : subItem.type === "tip" ? "#34d399" : "#38bdf8")
-                                        }
-                                        strokeWidth={isSubSelected ? "2" : "1.5"}
-                                        className="transition-all duration-300 group-hover:scale-105"
-                                      />
-                                      
-                                      {/* Label */}
-                                      <text
-                                        x={subX}
-                                        y={subY + 3.5}
-                                        textAnchor="middle"
-                                        fill={
-                                          mindMapStyle === "pastel"
-                                            ? (isSubSelected ? "#431407" : subTheme.text)
-                                            : (isSubSelected ? "#0f172a" : "#e2e8f0")
-                                        }
-                                        fontSize="7.5"
-                                        fontWeight="900"
-                                        className="font-mono tracking-wider select-none uppercase"
-                                      >
-                                        {subItem.label}
-                                      </text>
-                                    </g>
-                                  );
-                                });
-                              })()}
-                            </svg>
-
-                            {/* Floating Custom HTML Tooltip / Popover inside the board */}
-                            {selectedSubNode && (() => {
-                              const nodeIdx = selectedSubNode.nodeId;
-                              const subIdx = selectedSubNode.subIdx;
-                              const activeNode = revisionDeckData.mindMap?.nodes?.[nodeIdx];
-                              if (!activeNode) return null;
-                              
-                              const subItems = getSubItems(activeNode);
-                              const subItem = subItems[subIdx];
-                              if (!subItem) return null;
-                              
-                              const N = revisionDeckData.mindMap?.nodes?.length || 1;
-                              const center = { x: 400, y: 210 };
-                              const rx = 245;
-                              const ry = 135;
-                              
-                              const angle = (2 * Math.PI * nodeIdx) / N - Math.PI / 2;
-                              const targetX = center.x + rx * Math.cos(angle);
-                              const targetY = center.y + ry * Math.sin(angle);
-                              
-                              const K = subItems.length;
-                              const spread = K <= 1 ? 0 : Math.min(Math.PI * 0.75, (K - 1) * 0.38);
-                              const startAngle = angle - spread / 2;
-                              const subAngle = K <= 1 ? angle : startAngle + (subIdx * spread) / (K - 1);
-                              
-                              const subDist = 80;
-                              const subX = targetX + subDist * Math.cos(subAngle);
-                              const subY = targetY + subDist * Math.sin(subAngle);
-                              
-                              const leftPercent = (subX / 800) * 100;
-                              const topPercent = (subY / 420) * 100;
-                              
-                              const xOffset = subX > 400 ? -260 : 20;
-                              const yOffset = subY > 210 ? -120 : 10;
-                              
-                              return (
-                                <div 
-                                  className={`absolute border rounded-2xl p-4 shadow-2xl z-40 w-64 text-left animate-fade-in backdrop-blur-md pointer-events-auto transition-all ${
-                                    mindMapStyle === "pastel"
-                                      ? "bg-white/95 border-slate-250/60 text-slate-800"
-                                      : "bg-slate-900/95 border-teal-500/30 text-white"
-                                  }`}
-                                  style={{
-                                    left: `calc(${leftPercent}% + ${xOffset}px)`,
-                                    top: `calc(${topPercent}% + ${yOffset}px)`,
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <div className={`flex items-center justify-between border-b pb-1.5 mb-2 shrink-0 ${
-                                    mindMapStyle === "pastel" ? "border-slate-100" : "border-teal-800/40"
-                                  }`}>
-                                    <span className={`text-[9px] font-mono font-black uppercase tracking-widest flex items-center gap-1 ${
-                                      mindMapStyle === "pastel" ? "text-indigo-600" : "text-amber-400"
-                                    }`}>
-                                      {subItem.type === "formula" ? "üìê RULE / FORMULA" : subItem.type === "tip" ? "üí° EXAM TIP" : "üß† KEY CONCEPT"}
-                                    </span>
-                                    <button 
-                                      onClick={() => setSelectedSubNode(null)}
-                                      className={`font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                                        mindMapStyle === "pastel"
-                                          ? "text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200"
-                                          : "text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800"
-                                      }`}
-                                    >
-                                      ‚úï
-                                    </button>
-                                  </div>
-                                  <div className={`text-[11px] sm:text-xs font-semibold leading-relaxed overflow-y-auto max-h-40 scrollbar-thin ${
-                                    mindMapStyle === "pastel" ? "text-slate-700" : "text-teal-50"
-                                  }`}>
-                                    {renderTextWithKaTeX(subItem.text)}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                        </div>
-
-
-
-                      {/* Small Bottom Info Disclaimer */}
-                      <div className="pt-3 border-t border-slate-100 mt-4 shrink-0 text-center">
-                        <p className="text-[9.5px] font-mono text-slate-400 font-bold">
-                          Concept map parsed dynamically from Direct Classroom parameters
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab 3: Topic Summary & Key Highlights */}
-                  {activeRevisionTab === "summary" && (
-                    <div className="w-full max-w-5xl mx-auto p-4 sm:p-6 md:p-8 pb-24 sm:pb-8 flex flex-col overflow-y-auto min-h-0 bg-white flex-1 md:rounded-3xl md:shadow-md md:border md:border-slate-100/60 md:my-4">
-                      {(() => {
-                        const sourceBadge = getSourceBadgeInfo(activeRevisionSession);
-                        const subName = activeRevisionSession?.inferredSubject || activeRevisionSession?.subject || subject || "Science";
-                        const chapTitle = activeRevisionSession?.processedTitle || revisionDeckData?.mindMap?.title || "Class Lecture";
-                        const keyConcepts = revisionDeckData?.mindMap?.nodes || [];
-                        const flashcards = revisionDeckData?.flashcards || [];
-                        const masteredCount = Object.values(masteredCards).filter(Boolean).length;
-                        const totalCardsCount = flashcards.length;
-
-                        return (
-                          <div className="space-y-6">
-                            {/* Summary Header Banner */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white shadow-lg border border-teal-700/40">
-                              <div className="space-y-1.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="p-1.5 bg-amber-400 text-slate-950 rounded-lg text-xs font-black">
-                                    <Sparkles className="w-4 h-4" />
-                                  </span>
-                                  <h3 className="text-sm sm:text-base font-mono font-black tracking-wider uppercase text-amber-300">
-                                    Executive Concept Summary
-                                  </h3>
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-mono font-extrabold px-2 py-0.5 rounded-full border bg-emerald-950/60 text-emerald-300 border-emerald-500/40">
-                                    <span>{sourceBadge.icon}</span>
-                                    <span>{sourceBadge.label}</span>
-                                  </span>
-                                </div>
-                                <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
-                                  {chapTitle}
-                                </h2>
-                                <p className="text-xs text-teal-200 font-mono">
-                                  {subName} ‚Ä¢ Class {grade} ‚Ä¢ {board} Board Curriculum
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                                <button
-                                  onClick={() => handleDownloadMindMap("pdf")}
-                                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono font-black rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-102 active:scale-95"
-                                  title="Print / Save Full Revision Document as PDF"
-                                >
-                                  <Printer className="w-3.5 h-3.5" /> PRINT / PDF
-                                </button>
-                                <button
-                                  onClick={() => handleGenerateRevisionDeck(activeRevisionSession)}
-                                  disabled={loadingRevision}
-                                  className="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 text-white text-xs font-mono font-black rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-102 active:scale-95 disabled:opacity-50"
-                                  title="Sync & Regenerate with latest notes"
-                                >
-                                  <RefreshCw className={`w-3.5 h-3.5 ${loadingRevision ? "animate-spin" : ""}`} /> SYNC
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Revision Stats Glance */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                              <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200/60 flex flex-col">
-                                <span className="text-[10px] font-mono font-bold text-teal-700 uppercase">Core Topics</span>
-                                <span className="text-xl font-mono font-black text-teal-950 mt-1">{keyConcepts.length}</span>
-                                <span className="text-[9px] text-teal-600 font-semibold mt-0.5">High-yield themes</span>
-                              </div>
-                              <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/60 flex flex-col">
-                                <span className="text-[10px] font-mono font-bold text-amber-700 uppercase">Interactive Cards</span>
-                                <span className="text-xl font-mono font-black text-amber-950 mt-1">{totalCardsCount}</span>
-                                <span className="text-[9px] text-amber-600 font-semibold mt-0.5">Flashcard prompts</span>
-                              </div>
-                              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/60 flex flex-col">
-                                <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase">Mastered</span>
-                                <span className="text-xl font-mono font-black text-emerald-950 mt-1">{masteredCount} / {totalCardsCount}</span>
-                                <span className="text-[9px] text-emerald-600 font-semibold mt-0.5">
-                                  {totalCardsCount > 0 ? Math.round((masteredCount / totalCardsCount) * 100) : 0}% retention rate
-                                </span>
-                              </div>
-                              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 flex flex-col">
-                                <span className="text-[10px] font-mono font-bold text-indigo-700 uppercase">Formulas & Rules</span>
-                                <span className="text-xl font-mono font-black text-indigo-950 mt-1">
-                                  {keyConcepts.reduce((acc: number, n: any) => acc + (n.subNodes?.filter((s: any) => s.type === "formula" || s.type === "rule").length || 0), 0)}
-                                </span>
-                                <span className="text-[9px] text-indigo-600 font-semibold mt-0.5">Tested equations</span>
-                              </div>
-                            </div>
-
-                            {/* Section: Structured Concept Notes & Mind Map Breakdown */}
-                            <div className="space-y-4">
-                              <h4 className="text-xs uppercase font-mono font-black text-slate-700 tracking-wider flex items-center gap-2">
-                                <BookOpen className="w-4 h-4 text-teal-700" />
-                                <span>Mastery Breakdown & Key Formulations</span>
-                              </h4>
-
-                              <div className="space-y-4">
-                                {keyConcepts.map((node: any, idx: number) => {
-                                  const formulas = (node.subNodes || []).filter((s: any) => s.type === "formula" || s.type === "rule");
-                                  const concepts = (node.subNodes || []).filter((s: any) => s.type === "concept");
-                                  const tips = (node.subNodes || []).filter((s: any) => s.type === "tip" || s.type === "warning");
-
-                                  return (
-                                    <div key={idx} className="p-4 sm:p-5 rounded-2xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-teal-300 transition-all shadow-2xs">
-                                      <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-200/60">
-                                        <div className="flex items-center gap-2.5">
-                                          <span className="w-6 h-6 rounded-lg bg-teal-800 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
-                                            {idx + 1}
-                                          </span>
-                                          <h5 className="text-sm font-black text-slate-800 tracking-tight uppercase font-mono">
-                                            {node.topicName || `Topic ${idx + 1}`}
-                                          </h5>
-                                        </div>
-                                        <button
-                                          onClick={() => {
-                                            if (onDiscussWithCherry) {
-                                              onDiscussWithCherry({
-                                                topic: node.topicName || chapTitle,
-                                                subject: subName,
-                                                conceptTested: "Full Topic Review",
-                                              });
-                                            }
-                                          }}
-                                          className="text-[10px] font-mono font-bold text-teal-700 hover:text-teal-900 bg-teal-100/60 hover:bg-teal-200/70 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-                                        >
-                                          <span>üí° Clarify with Cherry</span>
-                                        </button>
-                                      </div>
-
-                                      {/* Core Concepts */}
-                                      {concepts.length > 0 && (
-                                        <div className="mb-3 space-y-1.5">
-                                          <span className="text-[10px] font-mono font-black uppercase text-slate-500 tracking-wider">
-                                            Core Principles & Mechanics:
-                                          </span>
-                                          <ul className="space-y-1.5 pl-2">
-                                            {concepts.map((c: any, cIdx: number) => (
-                                              <li key={cIdx} className="text-xs text-slate-700 flex items-start gap-2 leading-relaxed">
-                                                <span className="text-teal-600 font-bold shrink-0 mt-0.5">‚Ä¢</span>
-                                                <div className="flex-1">{renderTextWithKaTeX(c.text)}</div>
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      )}
-
-                                      {/* Formulas & Equations Grid */}
-                                      {formulas.length > 0 && (
-                                        <div className="mb-3 p-3 rounded-xl bg-teal-900/5 border border-teal-500/20 space-y-2">
-                                          <span className="text-[10px] font-mono font-black uppercase text-teal-800 tracking-wider flex items-center gap-1">
-                                            <span>üìê Mathematical Laws & Formulas:</span>
-                                          </span>
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                            {formulas.map((f: any, fIdx: number) => (
-                                              <div key={fIdx} className="p-2 rounded-lg bg-white border border-teal-200/60 shadow-2xs text-xs font-semibold text-teal-950">
-                                                {renderTextWithKaTeX(f.text)}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* Exam Tips & High-Yield Alerts */}
-                                      {tips.length > 0 && (
-                                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 space-y-1.5">
-                                          <span className="text-[10px] font-mono font-black uppercase text-amber-900 tracking-wider flex items-center gap-1">
-                                            <span>üí° Examiner Alert & Board Exam Tips:</span>
-                                          </span>
-                                          <div className="space-y-1">
-                                            {tips.map((t: any, tIdx: number) => (
-                                              <div key={tIdx} className="text-xs text-amber-950 leading-relaxed font-medium">
-                                                {renderTextWithKaTeX(t.text)}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Bottom Help Disclaimer */}
-                            <div className="pt-4 border-t border-slate-100 text-center text-[10px] font-mono text-slate-400 font-bold">
-                              Summary dynamically parsed from active classroom chalkboards and lesson artifacts.
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* IMMERSIVE FULLSCREEN MODE BACKDROP PORTAL OVERLAY */}
-                  {activeRevisionTab === "mindmap" && isMapFullscreen && (
-                    <div 
-                      onClick={() => setSelectedSubNode(null)}
-                      className={`fixed inset-0 z-50 flex flex-col overflow-hidden animate-fade-in text-left transition-all duration-300 ${
-                        mindMapStyle === "pastel"
-                          ? "bg-[#FAF6F0] text-slate-800"
-                          : "bg-[#031316] text-white"
-                      }`}
-                    >
-                      
-                      {/* Interactive Diagram chalkboard panel */}
-                      <div className="flex-1 flex flex-col min-w-0 h-full relative">
-                        {/* Chalkboard Slate Grid */}
-                        <div 
-                          className={`absolute inset-0 [background-size:24px_24px] pointer-events-none transition-all duration-300 ${
-                            mindMapStyle === "pastel"
-                              ? "bg-[radial-gradient(#e5dcd0_1.5px,transparent_1.5px)] opacity-60"
-                              : "bg-[radial-gradient(#1e3b3a_1.2px,transparent_1.2px)] opacity-25"
-                          }`}
-                        />
-                        
-                        {/* Fullscreen Overlay Header */}
-                        {(() => {
-                          const sourceBadge = getSourceBadgeInfo(activeRevisionSession);
-                          return (
-                            <div className={`p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-10 shrink-0 ${
-                              mindMapStyle === "pastel"
-                                ? "bg-[#FAF6F0]/95 border-[#e5dcd0]"
-                                : "bg-[#041a1e]/95 border-teal-950/80"
-                            }`}>
-                              <div className="flex items-center gap-2.5">
-                                <span className="p-2 bg-amber-500 text-slate-900 rounded-xl shadow-xs">
-                                  <Brain className="w-4 h-4 animate-pulse" />
-                                </span>
-                                <div>
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className={`text-xs sm:text-sm font-mono font-black tracking-widest uppercase ${
-                                      mindMapStyle === "pastel" ? "text-indigo-700" : "text-amber-400"
-                                    }`}>
-                                      IMMERSIVE CONCEPTUAL FLOW BOARD
-                                    </h3>
-                                    {/* Smart Source Badge */}
-                                    <span 
-                                      className="inline-flex items-center gap-1 text-[9px] font-mono font-extrabold px-2 py-0.5 rounded-full border shadow-2xs bg-emerald-50 text-emerald-800 border-emerald-300"
-                                      title={sourceBadge.description}
-                                    >
-                                      <span>{sourceBadge.icon}</span>
-                                      <span>{sourceBadge.label}</span>
-                                    </span>
-                                  </div>
-                                  <p className={`text-[10.5px] font-bold uppercase tracking-wide truncate max-w-sm sm:max-w-md ${
-                                    mindMapStyle === "pastel" ? "text-slate-700" : "text-teal-100"
-                                  }`}>
-                                    {activeRevisionSession.processedTitle || revisionDeckData.mindMap?.title} ‚Ä¢ {activeRevisionSession.subject || subject} (Class {grade})
-                                  </p>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {/* Sync Latest Button in Fullscreen Header */}
-                                <button
-                                  onClick={() => handleGenerateRevisionDeck(activeRevisionSession)}
-                                  disabled={loadingRevision}
-                                  className={`px-3 py-2 rounded-xl text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md disabled:opacity-50 ${
-                                    mindMapStyle === "pastel"
-                                      ? "bg-teal-700 hover:bg-teal-800 text-white"
-                                      : "bg-teal-700 hover:bg-teal-800 text-white border border-teal-500/40"
-                                  }`}
-                                  title="Sync latest classroom notes and regenerate"
-                                >
-                                  <RefreshCw className={`w-3.5 h-3.5 ${loadingRevision ? "animate-spin" : ""}`} />
-                                  <span>SYNC</span>
-                                </button>
-
-                                {/* Theme Toggle Button in Fullscreen Header */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMindMapStyle(prev => prev === "slate" ? "pastel" : "slate");
-                                  }}
-                                  className={`px-3 py-2 rounded-xl text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md ${
-                                    mindMapStyle === "pastel"
-                                      ? "bg-slate-200 hover:bg-slate-300 text-slate-800"
-                                      : "bg-teal-900/80 hover:bg-teal-800 text-teal-200"
-                                  }`}
-                                >
-                                  üé® THEME: {mindMapStyle === "pastel" ? "PASTEL" : "DARK SLATE"}
-                                </button>
-
-                                {/* Download PNG Button */}
-                                <button
-                                  onClick={() => handleDownloadMindMap("png")}
-                                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
-                                  title="Download Mind Map as Image (PNG)"
-                                >
-                                  <Download className="w-3.5 h-3.5" /> PNG
-                                </button>
-
-                                {/* Download SVG Button */}
-                                <button
-                                  onClick={() => handleDownloadMindMap("svg")}
-                                  className="px-3 py-2 bg-teal-800 hover:bg-teal-750 text-teal-100 border border-teal-700/50 rounded-xl text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
-                                  title="Download Mind Map as Vector Graphic (SVG)"
-                                >
-                                  <HardDriveDownload className="w-3.5 h-3.5" /> SVG
-                                </button>
-
-                                {/* Download PDF Button */}
-                                <button
-                                  onClick={() => handleDownloadMindMap("pdf")}
-                                  className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white border border-rose-500/30 rounded-xl text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
-                                  title="Print / Export Mind Map as PDF"
-                                >
-                                  <Printer className="w-3.5 h-3.5" /> PDF
-                                </button>
-
-                                <button
-                                  onClick={() => setIsMapFullscreen(false)}
-                                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white border border-rose-500/30 rounded-xl text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
-                                >
-                                  <Minimize2 className="w-3.5 h-3.5" /> EXIT FULLSCREEN
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Interactive Large SVG Viewport */}
-                        <div className="flex-1 flex items-center justify-center p-4 overflow-auto min-h-0 select-none">
-                          <svg 
-                            id="mindmap-fullscreen-svg"
-                            viewBox="0 0 800 420" 
-                            width="100%" 
-                            className="w-full max-w-4xl h-auto select-none overflow-visible"
-                          >
-                            <defs>
-                              <filter id="glow-selected" x="-20%" y="-20%" width="140%" height="140%">
-                                <feGaussianBlur stdDeviation="4" result="blur" />
-                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                              </filter>
-                              <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-                                <feDropShadow 
-                                  dx="0" 
-                                  dy={mindMapStyle === "pastel" ? "3" : "4"} 
-                                  stdDeviation={mindMapStyle === "pastel" ? "2" : "3"} 
-                                  floodOpacity={mindMapStyle === "pastel" ? "0.08" : "0.4"} 
-                                />
-                              </filter>
-                              <linearGradient id="centerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor={mindMapStyle === "pastel" ? "#b4a4eb" : "#1e5156"} />
-                                <stop offset="100%" stopColor={mindMapStyle === "pastel" ? "#9f86f0" : "#0a2c30"} />
-                              </linearGradient>
-                              <linearGradient id="selectedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#0d9488" />
-                                <stop offset="100%" stopColor="#0f766e" />
-                              </linearGradient>
-                              <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#115e59" />
-                                <stop offset="100%" stopColor="#134e4a" />
-                              </linearGradient>
-                              <marker 
-                                id="arrow-head" 
-                                viewBox="0 0 10 10" 
-                                refX="8" 
-                                refY="5" 
-                                markerWidth="5" 
-                                markerHeight="5" 
-                                orient="auto-start-reverse"
-                              >
-                                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill={mindMapStyle === "pastel" ? "#4b5563" : "#2dd4bf"} />
-                              </marker>
-                            </defs>
-
-                            {/* 1. Curved lines */}
-                            {(() => {
-                              const nodes = revisionDeckData.mindMap?.nodes || [];
-                              const N = nodes.length || 1;
-                              const center = { x: 400, y: 210 };
-                              const rx = 245;
-                              const ry = 135;
-
-                              return nodes.map((node: any, index: number) => {
-                                const angle = (2 * Math.PI * index) / N - Math.PI / 2;
-                                const targetX = center.x + rx * Math.cos(angle);
-                                const targetY = center.y + ry * Math.sin(angle);
-
-                                const isSelected = lastSelectedNodeId === index;
-                                const isMatched = (() => {
-                                  if (!mindMapSearch.trim()) return false;
-                                  const queryText = mindMapSearch.toLowerCase();
-                                  return (
-                                    node.topicName?.toLowerCase().includes(queryText) ||
-                                    node.keyFormula?.toLowerCase().includes(queryText) ||
-                                    (node.keyConcepts || node.coreConcepts || []).some((c: string) => c.toLowerCase().includes(queryText))
-                                  );
-                                })();
-
-                                const cx1 = center.x + (targetX - center.x) * 0.45;
-                                  const cy1 = center.y;
-                                  const cx2 = center.x + (targetX - center.x) * 0.55;
-                                  const cy2 = targetY;
-
-                                  const pathD = `M ${center.x} ${center.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${targetX} ${targetY}`;
-                                  const pTheme = getPastelTheme(index);
-
-                                return (
-                                  <g key={`fs-path-${index}`} className="pointer-events-none">
-                                    {isSelected && (
-                                      <path 
-                                        d={pathD} 
-                                        fill="none" 
-                                        stroke={mindMapStyle === "pastel" ? pTheme.stroke : "#fbbf24"} 
-                                        strokeWidth="7" 
-                                        opacity={mindMapStyle === "pastel" ? "0.15" : "0.35"} 
-                                        strokeLinecap="round"
-                                        className="animate-pulse"
-                                      />
-                                    )}
-                                    <path 
-                                      d={pathD} 
-                                      fill="none" 
-                                      stroke={
-                                        mindMapStyle === "pastel"
-                                          ? (isSelected ? pTheme.stroke : isMatched ? "#10b981" : "#4b5563")
-                                          : (isSelected ? "#fbbf24" : isMatched ? "#2dd4bf" : "#114c47")
-                                      } 
-                                      strokeWidth={isSelected ? "2.5" : isMatched ? "2" : "1.5"} 
-                                      strokeDasharray={
-                                        mindMapStyle === "pastel" 
-                                          ? "none" 
-                                          : (isMatched || isSelected ? "none" : "5 4")
-                                      }
-                                      markerEnd={mindMapStyle === "pastel" ? "url(#arrow-head)" : undefined}
-                                      className="transition-all duration-300"
-                                      strokeLinecap="round"
-                                    />
-                                    {isSelected && (
-                                      <circle 
-                                        cx={targetX} 
-                                        cy={targetY} 
-                                        r="12" 
-                                        fill="none" 
-                                        stroke={mindMapStyle === "pastel" ? pTheme.stroke : "#fbbf24"} 
-                                        strokeWidth="1.5" 
-                                        className="animate-ping" 
-                                        opacity="0.6"
-                                      />
-                                    )}
-                                  </g>
-                                );
-                              });
-                            })()}
-
-                            {/* 2. Central Hub bubble */}
-                            {(() => {
-                              const sourceBadge = getSourceBadgeInfo(activeRevisionSession);
-                              const rawTitle = activeRevisionSession.processedTitle || revisionDeckData.mindMap?.title || "Core Concept Hub";
-                              const maxChar = 22;
-
-                              return (
-                                <g filter="url(#shadow)" className="cursor-pointer" onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLastSelectedNodeId(0);
-                                  setExpandedNodes({ 0: true });
-                                  setSelectedSubNode(null);
-                                }}>
-                                  <rect 
-                                    x="270" 
-                                    y="166" 
-                                    width="260" 
-                                    height="88" 
-                                    rx="22" 
-                                    ry="22" 
-                                    fill="url(#centerGrad)" 
-                                    stroke={mindMapStyle === "pastel" ? "#7c3aed" : "#0d9488"} 
-                                    strokeWidth="2.5" 
-                                  />
-                                  {/* Source Tag Bubble on Top */}
-                                  <rect 
-                                    x="320" 
-                                    y="154" 
-                                    width="160" 
-                                    height="22" 
-                                    rx="7" 
-                                    ry="7" 
-                                    fill={mindMapStyle === "pastel" ? "#ffca28" : "#f59e0b"} 
-                                  />
-                                  <text 
-                                    x="400" 
-                                    y="168" 
-                                    textAnchor="middle" 
-                                    fill={mindMapStyle === "pastel" ? "#3e2723" : "#0f172a"} 
-                                    fontSize="8.5" 
-                                    fontWeight="900" 
-                                    letterSpacing="0.8"
-                                    className="font-mono uppercase select-none"
-                                  >
-                                    {sourceBadge.shortLabel}
-                                  </text>
-
-                                  {/* Prominently render Chapter / Document Name */}
-                                  {(() => {
-                                    if (rawTitle.length <= maxChar) {
-                                      return (
-                                        <text 
-                                          x="400" 
-                                          y="204" 
-                                          textAnchor="middle" 
-                                          fill="#ffffff" 
-                                          fontSize="12.5" 
-                                          fontWeight="900" 
-                                          className="font-sans tracking-wide uppercase select-none"
-                                        >
-                                          {rawTitle}
-                                        </text>
-                                      );
-                                    }
-                                    const words = rawTitle.split(" ");
-                                    let line1 = "";
-                                    let line2 = "";
-                                    for (const w of words) {
-                                      if ((line1 + " " + w).trim().length <= maxChar && line2 === "") {
-                                        line1 = (line1 + " " + w).trim();
-                                      } else {
-                                        line2 = (line2 + " " + w).trim();
-                                      }
-                                    }
-                                    if (line2.length > maxChar) line2 = line2.slice(0, maxChar - 2) + "...";
-                                    return (
-                                      <g>
-                                        <text 
-                                          x="400" 
-                                          y="197" 
-                                          textAnchor="middle" 
-                                          fill="#ffffff" 
-                                          fontSize="11.5" 
-                                          fontWeight="900" 
-                                          className="font-sans tracking-wide uppercase select-none"
-                                        >
-                                          {line1 || rawTitle.slice(0, maxChar)}
-                                        </text>
-                                        <text 
-                                          x="400" 
-                                          y="214" 
-                                          textAnchor="middle" 
-                                          fill="#ffffff" 
-                                          fontSize="11" 
-                                          fontWeight="800" 
-                                          className="font-sans tracking-wide uppercase select-none"
-                                        >
-                                          {line2}
-                                        </text>
-                                      </g>
-                                    );
-                                  })()}
-
-                                  <text 
-                                    x="400" 
-                                    y="238" 
-                                    textAnchor="middle" 
-                                    fill={mindMapStyle === "pastel" ? "#fdfaf6" : "#99f6e4"} 
-                                    fontSize="9" 
-                                    fontWeight="700" 
-                                    className="font-mono uppercase tracking-widest select-none opacity-95"
-                                  >
-                                    {activeRevisionSession.subject || subject} ‚Ä¢ CLASS {grade}
-                                  </text>
-                                </g>
-                              );
-                            })()}
-
-                            {/* 3. Capsules */}
-                            {(() => {
-                              const nodes = revisionDeckData.mindMap?.nodes || [];
-                              const N = nodes.length || 1;
-                              const center = { x: 400, y: 210 };
-                              const rx = 245;
-                              const ry = 135;
-
-                              return nodes.map((node: any, index: number) => {
-                                const angle = (2 * Math.PI * index) / N - Math.PI / 2;
-                                const targetX = center.x + rx * Math.cos(angle);
-                                const targetY = center.y + ry * Math.sin(angle);
-
-                                const isSelected = lastSelectedNodeId === index;
-                                const isMatched = (() => {
-                                  if (!mindMapSearch.trim()) return false;
-                                  const queryText = mindMapSearch.toLowerCase();
-                                  return (
-                                    node.topicName?.toLowerCase().includes(queryText) ||
-                                    node.keyFormula?.toLowerCase().includes(queryText) ||
-                                    (node.keyConcepts || node.coreConcepts || []).some((c: string) => c.toLowerCase().includes(queryText))
-                                  );
-                                })();
-
-                                const capW = 164;
-                                const capH = 48;
-                                const capX = targetX - capW / 2;
-                                const capY = targetY - capH / 2;
-
-                                const maxLen = 18;
-                                const rawName = node.topicName || "General Topic";
-                                const dispName = rawName.length > maxLen ? rawName.slice(0, maxLen - 2) + "..." : rawName;
-                                const pTheme = getPastelTheme(index);
-
-                                return (
-                                  <g 
-                                    key={`fs-node-${index}`} 
-                                    filter="url(#shadow)" 
-                                    className="cursor-pointer group select-none"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setLastSelectedNodeId(index);
-                                      setExpandedNodes({ [index]: true });
-                                      setSelectedSubNode(null);
-                                    }}
-                                  >
-                                    <rect 
-                                      x={capX - (isSelected ? 3 : 1)} 
-                                      y={capY - (isSelected ? 3 : 1)} 
-                                      width={capW + (isSelected ? 6 : 2)} 
-                                      height={capH + (isSelected ? 6 : 2)} 
-                                      rx="14" 
-                                      ry="14" 
-                                      fill="none" 
-                                      stroke={
-                                        mindMapStyle === "pastel"
-                                          ? (isSelected ? pTheme.stroke : isMatched ? "#10b981" : "transparent")
-                                          : (isSelected ? "#fbbf24" : isMatched ? "#2dd4bf" : "transparent")
-                                      } 
-                                      strokeWidth={isSelected ? "3" : isMatched ? "2" : "0"} 
-                                      opacity={isSelected ? "1" : isMatched ? "0.85" : "0"}
-                                      className="transition-all duration-300"
-                                    />
-                                    <rect 
-                                      x={capX} 
-                                      y={capY} 
-                                      width={capW} 
-                                      height={capH} 
-                                      rx="12" 
-                                      ry="12" 
-                                      fill={
-                                        mindMapStyle === "pastel"
-                                          ? pTheme.fill
-                                          : (isSelected ? "url(#selectedGrad)" : "url(#nodeGrad)")
-                                      } 
-                                      stroke={
-                                        mindMapStyle === "pastel"
-                                          ? (isSelected ? "#7c3aed" : isMatched ? "#059669" : pTheme.stroke)
-                                          : (isSelected ? "#f59e0b" : isMatched ? "#0f766e" : "#0d3c38")
-                                      } 
-                                      strokeWidth={mindMapStyle === "pastel" ? "1.8" : "1.5"} 
-                                      className="transition-all duration-300 group-hover:stroke-teal-400 group-active:scale-98"
-                                    />
-                                    <circle 
-                                      cx={capX + 16} 
-                                      cy={targetY} 
-                                      r="8.5" 
-                                      fill={
-                                        mindMapStyle === "pastel"
-                                          ? pTheme.stroke
-                                          : (isSelected ? "#115e59" : "#0d3d39")
-                                      } 
-                                      stroke={
-                                        mindMapStyle === "pastel"
-                                          ? pTheme.text
-                                          : (isSelected ? "#fbbf24" : "#0d9488")
-                                      }
-                                      strokeWidth="1"
-                                    />
-                                    <text 
-                                      x={capX + 16} 
-                                      y={targetY + 3} 
-                                      textAnchor="middle" 
-                                      fill={
-                                        mindMapStyle === "pastel"
-                                          ? "#ffffff"
-                                          : (isSelected ? "#fbbf24" : "#2dd4bf")
-                                      } 
-                                      fontSize="8" 
-                                      fontWeight="900" 
-                                      className="font-mono select-none"
-                                    >
-                                      {index + 1}
-                                    </text>
-                                    <text 
-                                      x={capX + 32} 
-                                      y={targetY + 3} 
-                                      fill={mindMapStyle === "pastel" ? pTheme.text : "#ffffff"} 
-                                      fontSize="9.5" 
-                                      fontWeight="900" 
-                                      className="font-sans uppercase tracking-wide select-none group-hover:opacity-80 transition-colors"
-                                    >
-                                      {dispName}
-                                    </text>
-                                    <g transform={`translate(${capX + capW - 24}, ${targetY - 6.5})`}>
-                                      <rect 
-                                        width="16" 
-                                        height="13" 
-                                        rx="4" 
-                                        ry="4" 
-                                        fill={
-                                          mindMapStyle === "pastel"
-                                            ? pTheme.stroke
-                                            : (isSelected ? "#0d534f" : "#114c47")
-                                        } 
-                                        opacity={mindMapStyle === "pastel" ? "0.15" : "1"}
-                                      />
-                                      <text 
-                                        x="8" 
-                                        y="9" 
-                                        textAnchor="middle" 
-                                        fill={mindMapStyle === "pastel" ? pTheme.text : "#ffffff"} 
-                                        fontSize="7.5" 
-                                        fontWeight="bold" 
-                                        className="font-mono"
-                                      >
-                                        {getSubItems(node).length}
-                                      </text>
-                                    </g>
-                                  </g>
-                                );
-                              });
-                            })()}
-
-                            {/* 4. Sub-branch nodes for the selected parent node in fullscreen */}
-                            {(() => {
-                              if (lastSelectedNodeId === null) return null;
-                              const parentNode = revisionDeckData.mindMap?.nodes?.[lastSelectedNodeId];
-                              if (!parentNode) return null;
-
-                              const nodes = revisionDeckData.mindMap?.nodes || [];
-                              const N = nodes.length || 1;
-                              const center = { x: 400, y: 210 };
-                              const rx = 245;
-                              const ry = 135;
-
-                              const angle = (2 * Math.PI * lastSelectedNodeId) / N - Math.PI / 2;
-                              const targetX = center.x + rx * Math.cos(angle);
-                              const targetY = center.y + ry * Math.sin(angle);
-
-                              const subItems = getSubItems(parentNode);
-                              const K = subItems.length;
-                              if (K === 0) return null;
-
-                              const spread = K <= 1 ? 0 : Math.min(Math.PI * 0.75, (K - 1) * 0.38);
-                              const startAngle = angle - spread / 2;
-
-                              const pTheme = getPastelTheme(lastSelectedNodeId);
-                              const subTheme = getSubNodePastelTheme(lastSelectedNodeId);
-
-                              return subItems.map((subItem: any, i: number) => {
-                                const subAngle = K <= 1 ? angle : startAngle + (i * spread) / (K - 1);
-                                const subDist = 80;
-                                const subX = targetX + subDist * Math.cos(subAngle);
-                                const subY = targetY + subDist * Math.sin(subAngle);
-
-                                const subW = 114;
-                                const subH = 28;
-                                const subX_rect = subX - subW / 2;
-                                const subY_rect = subY - subH / 2;
-
-                                const isSubSelected = selectedSubNode?.nodeId === lastSelectedNodeId && selectedSubNode?.subIdx === i;
-
-                                return (
-                                  <g 
-                                    key={`fs-sub-${lastSelectedNodeId}-${i}`}
-                                    className="cursor-pointer group select-none animate-fade-in"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedSubNode({ nodeId: lastSelectedNodeId, subIdx: i });
-                                    }}
-                                  >
-                                    {/* Connector Line */}
-                                    <line
-                                      x1={targetX}
-                                      y1={targetY}
-                                      x2={subX}
-                                      y2={subY}
-                                      stroke={
-                                        mindMapStyle === "pastel"
-                                          ? pTheme.stroke
-                                          : (isSubSelected ? "#fbbf24" : "#2dd4bf")
-                                      }
-                                      strokeWidth={
-                                        mindMapStyle === "pastel"
-                                          ? "1.5"
-                                          : (isSubSelected ? "2" : "1.2")
-                                      }
-                                      strokeDasharray={
-                                        mindMapStyle === "pastel"
-                                          ? "none"
-                                          : (isSubSelected ? "none" : "3 2")
-                                      }
-                                      markerEnd={mindMapStyle === "pastel" ? "url(#arrow-head)" : undefined}
-                                      opacity="0.8"
-                                    />
-                                    
-                                    {/* Sub-node bubble */}
-                                    <rect
-                                      x={subX_rect}
-                                      y={subY_rect}
-                                      width={subW}
-                                      height={subH}
-                                      rx="8"
-                                      ry="8"
-                                      fill={
-                                        mindMapStyle === "pastel"
-                                          ? (isSubSelected ? "#ffca28" : subTheme.fill)
-                                          : (isSubSelected ? "#fbbf24" : "#0f3a40")
-                                      }
-                                      stroke={
-                                        mindMapStyle === "pastel"
-                                          ? (isSubSelected ? "#d97706" : subTheme.stroke)
-                                          : (isSubSelected ? "#d97706" : subItem.type === "formula" ? "#f59e0b" : subItem.type === "tip" ? "#34d399" : "#38bdf8")
-                                      }
-                                      strokeWidth={isSubSelected ? "2" : "1.5"}
-                                      className="transition-all duration-300 group-hover:scale-105"
-                                    />
-                                    
-                                    {/* Label */}
-                                    <text
-                                      x={subX}
-                                      y={subY + 3.5}
-                                      textAnchor="middle"
-                                      fill={
-                                        mindMapStyle === "pastel"
-                                          ? (isSubSelected ? "#431407" : subTheme.text)
-                                          : (isSubSelected ? "#0f172a" : "#e2e8f0")
-                                      }
-                                      fontSize="7.5"
-                                      fontWeight="900"
-                                      className="font-mono tracking-wider select-none uppercase"
-                                    >
-                                      {subItem.label}
-                                    </text>
-                                  </g>
-                                );
-                              });
-                            })()}
-                          </svg>
-                        </div>
-
-                        {/* Interactive Hint */}
-                        <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 border px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg shrink-0 select-none z-10 pointer-events-none ${
-                          mindMapStyle === "pastel"
-                            ? "bg-white/95 border-slate-200"
-                            : "bg-slate-950/80 backdrop-blur-xs border-teal-500/20"
-                        }`}>
-                          <span className={`w-2 h-2 rounded-full animate-pulse ${
-                            mindMapStyle === "pastel" ? "bg-indigo-600" : "bg-teal-400"
-                          }`} />
-                          <p className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
-                            mindMapStyle === "pastel" ? "text-indigo-900" : "text-teal-300"
-                          }`}>
-                            TAP BRANCH CAPSULES ABOVE TO REVEAL KEY DETAIL METADATA INSTANTLY
-                          </p>
-                        </div>
-
-                        {/* Floating Custom HTML Tooltip / Popover inside fullscreen board */}
-                        {selectedSubNode && (() => {
-                          const nodeIdx = selectedSubNode.nodeId;
-                          const subIdx = selectedSubNode.subIdx;
-                          const activeNode = revisionDeckData.mindMap?.nodes?.[nodeIdx];
-                          if (!activeNode) return null;
-                          
-                          const subItems = getSubItems(activeNode);
-                          const subItem = subItems[subIdx];
-                          if (!subItem) return null;
-                          
-                          const N = revisionDeckData.mindMap?.nodes?.length || 1;
-                          const center = { x: 400, y: 210 };
-                          const rx = 245;
-                          const ry = 135;
-                          
-                          const angle = (2 * Math.PI * nodeIdx) / N - Math.PI / 2;
-                          const targetX = center.x + rx * Math.cos(angle);
-                          const targetY = center.y + ry * Math.sin(angle);
-                          
-                          const K = subItems.length;
-                          const spread = K <= 1 ? 0 : Math.min(Math.PI * 0.75, (K - 1) * 0.38);
-                          const startAngle = angle - spread / 2;
-                          const subAngle = K <= 1 ? angle : startAngle + (subIdx * spread) / (K - 1);
-                          
-                          const subDist = 80;
-                          const subX = targetX + subDist * Math.cos(subAngle);
-                          const subY = targetY + subDist * Math.sin(subAngle);
-                          
-                          const leftPercent = (subX / 800) * 100;
-                          const topPercent = (subY / 420) * 100;
-                          
-                          const xOffset = subX > 400 ? -260 : 20;
-                          const yOffset = subY > 210 ? -120 : 10;
-                          
-                          return (
-                            <div 
-                              className={`absolute border rounded-2xl p-4 shadow-2xl z-40 w-64 text-left animate-fade-in backdrop-blur-md pointer-events-auto transition-all ${
-                                mindMapStyle === "pastel"
-                                  ? "bg-white/95 border-slate-250/60 text-slate-800"
-                                  : "bg-slate-900/95 border-teal-500/30 text-white"
-                              }`}
-                              style={{
-                                left: `calc(${leftPercent}% + ${xOffset}px)`,
-                                top: `calc(${topPercent}% + ${yOffset}px)`,
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className={`flex items-center justify-between border-b pb-1.5 mb-2 shrink-0 ${
-                                mindMapStyle === "pastel" ? "border-slate-100" : "border-teal-800/40"
-                              }`}>
-                                <span className={`text-[9px] font-mono font-black uppercase tracking-widest flex items-center gap-1 ${
-                                  mindMapStyle === "pastel" ? "text-indigo-600" : "text-amber-400"
-                                }`}>
-                                  {subItem.type === "formula" ? "üìê RULE / FORMULA" : subItem.type === "tip" ? "üí° EXAM TIP" : "üß† KEY CONCEPT"}
-                                </span>
-                                <button 
-                                  onClick={() => setSelectedSubNode(null)}
-                                  className={`font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                                    mindMapStyle === "pastel"
-                                      ? "text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200"
-                                      : "text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800"
-                                  }`}
-                                >
-                                  ‚úï
-                                </button>
-                              </div>
-                              <div className={`text-[11px] sm:text-xs font-semibold leading-relaxed overflow-y-auto max-h-40 scrollbar-thin ${
-                                mindMapStyle === "pastel" ? "text-slate-700" : "text-teal-50"
-                              }`}>
-                                {renderTextWithKaTeX(subItem.text)}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* Footer of Revision Center */}
-                <div className="bg-slate-50 border-t border-slate-200/60 p-4 shrink-0 flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-slate-400 font-black tracking-wider uppercase">
-                    Cherry Ma'am Study Companion v2.5
-                  </span>
-                  <button 
-                    onClick={handleCloseRevisionDeck}
-                    className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer active:scale-95 shadow-2xs"
-                  >
-                    Close Deck
-                  </button>
-                </div>
-
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* Kiara Live Voice Counselor Modal */}
-        <KiaraLiveVoiceModal
-          isOpen={isKiaraVoiceModalOpen}
-          onClose={() => setIsKiaraVoiceModalOpen(false)}
-          studentName={studentName}
-          grade={grade}
-          board={board}
-          subject={subject}
-          lowestMetric={lowestMetric}
-          performanceData={{
-            conceptClarity: dashboardStats.conceptClarity,
-            theoreticalCore: dashboardStats.theoreticalCore,
-            calculationPrecision: dashboardStats.calculationPrecision,
-            formulaRecall: dashboardStats.formulaRecall,
-            socraticStamina: dashboardStats.socraticStamina,
-            strengths: dashboardStats.strengths,
-            growths: dashboardStats.growths,
-            totalQuizzes: quizAttempts?.length || 0,
-            classesCompleted: pastSessions?.length || 0,
-            snapshotsSaved: snapshots?.length || 0,
-            lowestMetric: lowestMetric,
-          }}
-        />
-
-        {/* High-Definition Blackboard Snapshot Zoom & Download Modal */}
-        {selectedSnapshotForModal && (
-          <div className="fixed inset-0 bg-[#06181b]/90 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in select-none">
-            <div className="bg-[#0a221a] border border-teal-500/40 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-scale-up">
-              {/* Modal Header */}
-              <div className="p-4 bg-[#071a14] border-b border-teal-900/60 flex items-center justify-between gap-3 text-white">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-[#c4f500] flex items-center justify-center text-sm font-bold shrink-0">
-                    üì∏
-                  </div>
-                  <div className="min-w-0 text-left">
-                    <h4 className="text-xs sm:text-sm font-bold text-white truncate font-sans">
-                      {selectedSnapshotForModal.topicTitle || "Classroom Blackboard Snapshot"}
-                    </h4>
-                    <p className="text-[10px] text-teal-300/80 font-mono">
-                      Auto-Captured ‚Ä¢ {formatDate(selectedSnapshotForModal.timestamp)}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedSnapshotForModal(null)}
-                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
-                >
-                  ‚úï
-                </button>
-              </div>
-
-              {/* Large Image Preview Slate */}
-              <div className="p-4 sm:p-6 bg-[#04120e] flex-1 overflow-auto flex items-center justify-center">
-                {selectedSnapshotForModal.imgData ? (
-                  <img
-                    src={selectedSnapshotForModal.imgData}
-                    alt={selectedSnapshotForModal.topicTitle}
-                    className="max-h-[60vh] max-w-full rounded-xl shadow-lg border border-teal-900/40 object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="p-12 text-center text-teal-300/60 font-mono text-xs">
-                    No image data available for this snapshot slate.
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer with Actions */}
-              <div className="p-4 bg-[#071a14] border-t border-teal-900/60 flex items-center justify-between gap-3">
-                <p className="text-[10.5px] text-teal-200/70 font-sans hidden sm:block truncate max-w-md">
-                  {selectedSnapshotForModal.description || "High-definition blackboard formula notes & chalkboard derivations."}
-                </p>
-                <div className="flex items-center gap-2 ml-auto">
-                  <button
-                    onClick={() => {
-                      handleDownloadImage(selectedSnapshotForModal);
-                    }}
-                    className="py-2 px-4 bg-teal-500 hover:bg-teal-400 active:scale-95 text-[#041a14] rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md"
-                  >
-                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>Download HD JPG</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedSnapshotForModal(null)}
-                    className="py-2 px-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-mono font-bold transition-colors cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-};
+                {(() xúÏ=Yo#«ôÔ˛e⁄Î•ì‘9÷–#4öœ #Yñdc≥Sl…é˙r¢dFØyZ$A‰aëÖ≥ãı>Âe±»Ôô?ˇÑ˝æ™Íì›]’$5W‹Ä«bwuuﬂ}’ﬁ>ôΩGÊ.√uÇê‘dè¯Ï“L◊y»åãá4§˜ª#ãÒ¯7ø!œø˘¨≤è–©}∆]ã9„pR›⁄¶A»|6<t#'Ñ∑æ¸öa˜íZ⁄…SÏk≠;2-¯Ÿ~‡∫£Œö≤Û	ºVﬁ1ÓîÜ¶3Nªı…ﬁ>ÅˆˆHﬂl©?`≥°Ÿã}Bº´ÒFÉÎ≈>Åoj|¿3∞k±o˚dù‹'G4út}¯Ê∞›ŒÔPO¥[#ìçıı5“'ÎüΩW“≥œ¬»wHª‰!˜ÜÊ%1 ¢Çcj≥Ω÷`‹	,≤Œ›ııﬁ›2p˝!Û;É¯Òpw}ùxWùm‚]w6ª;$∞˚ÛYÏäˇ”1\ãÿ√>ˇ€wßƒôtÊ¿»Ø£ 4G◊ùßå9dLΩŒ	&æÈ\t÷I»Æ¬ŒtØêÄY∞»«uXkøtÑÃzì≥h–	ÈÄ”Ks€‡:‰„ﬁM≈≈9ÛQÁà⁄ÄyÒ·O}Í%Cñ`¬Òù §~H¶ùQdÒ)O;4
+› —¬ÁQ∫NÂsB¬k∑Ç7k’¥sùCÀ4.ˆfÌ5µÄÖFh^≤SI3ŒÈ†›J…Ek≠jEJdˆ6s˜◊Ä√vÆ,2rù∞cªé+∂Ë*wÆ5$°Où¿ƒïÔPXàÍ55"?p˝éÁöb%'tËN±ØÀàaz—‚‘be¶W˚:\BË¶ˆ ¿x{]Çôˆùıx ˆPN ¢∆	j±Œ∆˙é™Û>IQ∞£∑õÎ>7q/ôﬂO}*âªàxñG7h[˜˝õ’˚ZÜ àÅGù˝ü~¯›ˇﬁÎÒ?ïmß¨ß=„‘ÁfMıÓΩû ‰˝2⁄$õºZå∞MghSÔùDáxnZ∏2j˝å
+x≈®ﬂ—EÖC◊1òí#Xp`“ﬁ€áAd€‘ø~'— ûõ¿öc˜gD¿+FÑÔˇ§ãgb©…G‰ÿYˆ·¡∑ë˘›;â|bZ¿lÊSk¯3
+‡ïàE’EÅSf‡∆û¯∏”GÅ™Á††T‚™;_F ’¿uPºÜÔ∫cü† p•–w≠`iÌgkN£ô”⁄‡I|ãÃ¡=bBç
+4SÛ‰£è*T÷&”ÿ¨Ôw*€ü≈w¶c§∏|c√ª˙¶µ/óªØÜä˘—M;õ€®4N;[õ$ã	·ã=ÈlÑ¸ë(71áCXÊ
+»ÁdD1;1ERPˇ«>ö∞Çù–Ì¯d‰ªvBvpI‹TlúàQË€0ÚπŒõgßß"Ñ·µDvF¶Ê0úÙ…ãgûﬁ¸”rSGüÒÍ)6D‡Tmì",d(8¬AAså¡BåPÉT‘è P5¡–5X‘¬√
+êÜ¢Ñ8%Ûó.W¬»'‘ZÏlç`RuT9 æ…YxÁ9I©A ™2L)nk\â•T÷ª; ,U¨ø»¯Û•^ù–mZrU»cmìàj3a;„NsƒlP´•¬9˛~©$UZh:ñâf=˘≤™ÊùIªWÜß$J…~Ü@ò_ÈH∏&æ∞áØ OŸú…·Ù¡êè}ï@xØv\5
+G-ß®yX˘hmﬁ·p≥÷.„8(\Q”!»Pò!_õlÍπ~X*TñÒ&ÄßDäπ¬cÍW ù¬Îpa»õÛ‰lÍ•Ã¨‰é˘¸‡ŸËì«œŒûú><´Äó‚Å≈©⁄Ù™@⁄_,+_â…Ê'UÎ˙∞Mß3È<ﬂﬁ]GÏD\‹Ævt¥Ö[≠Æ¬uòÌI◊Å(.sD⁄ÚX”ıµöÅ*ºRÒUÁù*%xYâz6∆ÎÏ
+(ó?/ﬁã’÷ñP
+»o0 Ÿ-µ`}ÊQˇ¬bAû"ÌE⁄-äã,4’=ØF˛‰øµÏf<T'f@pèÔıºfê*[kˇp¬| ÿGÙü©≤7ÄÚò9 Ûá…Ä»µhÿû≈‡ëÌ˙å¿ +Ô+?Æî¿K®T|’»∆‰#ﬂáFÁtÆœÂΩd±ûT é‡ãÁÎJÁoÒ”ÓªÊª8}‡mÌ“o‘LDÙkG“ì}øˇ~Œµ˛\|T=6Òe·sñsñh›.<¸.¢˜òÖ'¸ÔÛ	®zïì™ÏNóÁbN1k(e=-í~æÁg!£ÄÙwç√€®_cQè©ñhœô:
+t≈;5Q®õâñ;jÄsˆÓàŒª;Bz¨ˇ¯hp€YWÑtäuúïÓ=˘Ÿ∏!ÓàHüüR<“¢4,À€wöÂQE©‚ Ô∂á[~π–æû±¸⁄√DæÊ“u≤ÖëÁ1ﬂ†SŸn„´ÄœIÃH¡Bã‚ˇb|cké∆O–<J˙ã~\∆ƒ‰ºÊ…«≈œ˘Oã˚>å}˚n¿“Æ˘Ø˘û˘mÖ¡7æn^‹®°/1ﬂ~B‘öú.à◊J˘Ò•÷]4UŸ¶ Ïú{$t«cã!ê:m[0çI|$9ÔHJú
+Ü¬ÇŒY•öf¨m”D´´’j?&“€¨Ä˘L ≤∫Ωg"ws˙˝v⁄s™º~M◊ÅÆ±œ2Î?ô˛A/æ€¬„Ì‹Mıtpm?8†M‡L¯ø∆6±¥hÉM~Úa∂`Ê:∆Äÿm37˘‚î”˘Í‚ª∂yJ√]Î ?[A0=¡øQeıùi
+?äQŒªOüâdÄıÿ∞ÌÅöâOﬂ«?î§b^‹í÷&Á†Å›èo‹·7JT>`√EDI}Üs»y'’∑∏FxGÿv+l±êWkKùH§èNü¡êÃK6Á∆√ º\<cÌJ© w˛5.∆|n$àÄŒ]7†~OÃÒƒÇˇ -6˘Kr€FÅkE†˛uB◊C∑V««O·_”Œùm¿^¯'Á’Xëœ◊ﬁı⁄Ø;@RÂ≤vÿ%ê˙Ä/Hc£c‚-$qËZÆﬂóöM7}˜Çi˘é4ñõ#ÿFáÿ•#øñE¡&ê]p;–∞K¨RpéÖ`=2o›.j(eÇ2◊ú2Q©Ãê`\Ä(÷ôö√l Ñ˚”ÄãéŸÉÒ'†œ›>áQ™!/=sñµ∞óc◊øÊFàÃ}¿$”¿õ≠C¥©»ÿ26´/âV˘∫≥Ç’º*´%0Isé/ G≈0"r‡Sÿ√9C≤»Õ˘ÎÀˇ¯û|±Äáj˜0Ña`1{•3÷a†uÎ≤^≥.Çúw2‚Y*f»áØ†J≤’C¡SPπC∂∏Î#	XDVN∏u⁄TF+¶k®Á—YÈÑÜ>pá◊P–ÿHte;k‘’1º_
+†ZvÄ¬(b± 4Uı>¯ âH!¸ËGˆP¸íåæƒÆÉ‰•ã+êGı>«ÏëSÿ†3Ñ?g/GíF>‹-“£ocÃ$ID∫>d#”·p›“≥µ‰‹¯jNMGÆoG’µËÒvC8ˇÄˇ∏ÄYC€ßEÚi^ûDq2ŒÇ…Ì∂í(:;C?$3Gdìkl°XÌMi¥-uq)Ÿ+7¢	w∏-¡ƒù&x˜Dﬁ\tØ≤f(‹Ö2””Ó¸©ÃËÕxoÊÕ∑ÖÑ:¶ç◊ƒ<ÿ´ı”¸O µ r:„}ú+äâ_Ûã£√Á¯4⁄®ïıá…dK«tEó!ìÄ?1ë‰3e¡∞ç∑HQp,“D*‰§à(Ÿ∞ê@ä4 6CÏ	ÈdDQ§ÅÎ¿‡∫çIesdª`◊èóßÑÄ]œ?XﬂŸ06ÿ7ŒéK‘J)^)V5!reª?gSœªE*µ{Ä¢’/Ÿ5ëÀ“ â¯`‘ë.˘DtCz¡Ëî^æOØªf¿ˇﬂ.m∂ÜÌJüHO?œ@]§“»Ô9Üö9`ëç§rAP∑V©a±
+ÆZ˚èÆ®MŒ„EjUÂ[’µ©◊ná}–Y—ü¸	1áW}‚D8ns”]˚d∫ ö{3ËÂ¶¬ “Uu‚EK>P™)≈Ÿ⁄˘ÁÔı’—B∑˚≥P€ öyµŸ&¨i1…ÜØîÒ™}´çT≠«ÆrÂ;v~.Öi§	$,"µ‰	%ˆ©X◊ÃïdV∑R+3CÄg› tΩﬂı®H‰nØixÛ^ôè,`·YQ®mh«Kœ
+ì•RCÉ^,ßzíZ6Ñgh‰D÷†`áà˝5çl≥y≈‡>i=2À·ì[àéz¢¯o–‘ü¨-‚ÑQJÏ∫+	 /¨LS3îÌ√~óƒ≤b‰ñ»J“JWI∆†çFx5E%º
+Ë$„®—¿; ˝ÕüƒE?tâuÖÌ9â-Ja]ÕoÓÆg6+≤nÏy≈1ï"ñ†∆Kóè˝Ù√ˇEû yoo¨iÍznIŸ˙MÅÇ∏.ÀÚp @HlEAETÀõ	?í#æN§Ω˘NCÉ(°≥<,$°ThàÔ'ﬂòáàLà’õ	ˇC¡jëˆ÷Í!b≈í¨FeD¬¬…¶agÀ ›j ®»î¡W#‹ÛvíTôÈÖQ˙ÂQû˚™ò˝Ù*Q+`5—œÖÊÈÜñM#ë∆˘ˇ;dC´?5Y—	ÕÄ,6‹´£ÂiM≈§{Aï(ªYlÂ
+iiñ*®K6÷™YPìâG%õ9nà˜›)OuΩ˙ˇ·Ñ]˙ÆÛM¯9D∆xîm˝±˝Löq#e˘éÆ¶ÒJ∞ÒYEË€I†Ø®å&∑RwWí‡•m<‚cQ∞JãRà|Ææ(HqWYèB'◊∞‹ﬂﬁHœM‚À¢"êÏ%±\’=eóåZq§D˚†⁄˙ÓõÉÀq†{2„©ˆª∆â~Ò¶q¢d©ÊH∑¿ë8Í√t¥≠VíáùÚ¿ÕÖòòn^≤ûT˝Kv=pQ®&ÆQê	≥<›ÿ‚ñ¨ù ˝‰¬µ:PJ¨ˆÀ˚ÒÔ˚=9ãá´i˙/«û˚Á/˚“#/˚«oRˇΩ‘'tk‰;‰‰∫|Ñ≥ t˙X;´–·ìL'H¨Íd£∑Ÿ€ tt™9=•⁄¶™sREEFz£À›§q>¯fü~q|¯Ë‰ú==~HéNfÖ«≈ıS¬„òvûX|Á*M	WáçÒ‘{YLêúªÆ5®’\JçŒzZ1Z}©zΩM˛öA…ôÇª
+ÍÍÁR∂∞¨◊è‰Ñ5®Ééƒ§/-ÕKÎ∏›∞€|8ÌñàBVY∏äâ’©†ıŸV ¸);38ÅrÄŸ‚°@π{1[O"A≤a#;27'',‘'=’Øb}vS=ÌIŒ‰I4®•_j&˙jÉØÃb|o/Xú·'»CÍ_,*πä◊)g‘7&‰#ÚòóàØï§tife°>Ê‘≈?ê‰.….º«Ì]U	=9ßruπ∞©IÚÜr ÂIDjı=”Ò¢PõÁì*	ûóÌﬂõ≈¿Ãß†“É O'‘3©ê¡S˛zõuCÍèô<@ijÒ,	&¿£òø◊äQƒ›nW5Éy©#áLUzSÜxVgt”ÑVƒªG\	=-3Ãå¥ÓQ–w£êáOÛÏ-q+ã‰€º!0‚ N˝tj7_≠∞‹*=˛®áÓ‘±\:î[T˘r¨Oì[Ÿ≤±1ïÃÈÕq|yôä\^ﬁ·NººyÕπquŸ˙≈êïΩ‚Èì≥Ø?Oƒ‘∫7ÿúÙ∑†ïM÷˛˙sù¬ã≤◊Aû≥…¢’9í˜t°H6=pÙƒO:ß, '«üøv8Ç14Å£ÍÍ¬m:⁄ﬂ±;ÑÖ˘‹7á§GŒ}∆j‰›¢`Ô≥¨(ò‰Å˜ª¢â¢0oy√8H¯Ì®ı•6!yXYKÚ_πZÙíöZ?|Qg+`Æ^˜ıñª±·±‹‘ú”}”n◊9˛Ôã˘≈Áµù>°Œ5#≈*µù.Gdû—ZÎÜÓ3w ¸C∞ˆZ÷⁄äÜxXT~<ŸFk™˙#ÜÎ3ôw&!r≠∏6k∑ç8Vö◊Xdı1uO˚b·V[
+kåxéˇ†&rw˙sìX„Ãœ-Ω∫X9 AÊ8ræœÛAÊ*ïØæ\Ù¶tlàÇh9äË„L˛‚#´+/&.-"ÇóVÕkí k¥≠< ´ö2Â™Q$JÒNëdÌ§5Q¸.usBC—[ZgbEAΩ∑Q£`S?‚uÖï
+x»¡5€Ù'ûNùØZG¶≈∂¬zÒ•üZ4ŸVéL2RC?r∞AÉ‹èbhJ¯_ƒ¡'¶eQ4ÒqZïá¯Ä{ìÌïg7â†.≠Æ∑+™Îïy´®ÆwG?	)1IJsÍ⁄•¥s≈V.í2Xû0∏Ωalå™qAs©∏õ±â°:kp±<Èrè„]YÛ∫§*_ÊR˚çã*2KΩ˙§yΩ4¡™$›Õ•ÚÎf13“íÌOHdÅ&iki æzS heNwÖAk.›õüGß6I‘£•yÉ|Ÿf∏]–ò’8ì≠~˘él6 x¨ÑE>6ÏµA¬j√Ù∫&)s´Ãô”j¶êPojÙ∆∏¥∑˙‰—ø<:¸Í¸È◊è»ŸWGGßøjË”éOF[–ßΩ]‚”Æñ˜tçrP•Êâ¯≥e¡Ú$z/Ó)pí¥´Wˆ\‘»v"oùM5kßõ^∂vEÌsº%_^•©ﬁq!}äƒ•…¶"?¥i$œFô;©Üì*4ZÈ8ø
+yíuëd’â›jS^ÌΩipÒ·Ñz8ÙxUWj∂^â¥üe$îÃ®`'1Tª14TÁ	Œô4î†A∫ˆóüˇ-ŒìEÖlœgÍÓ%#Ü\ò§;¨ßNò»`‘"#Ä(òóR+ ¡µœÛ;6‰ÁSaUzYG‘w·'è-°kI®UÑcÖÈ((G¶GÖb≥EÀ.º6‹làùy_‡ÍëSÑNá¶o*“«–G± ﬂ	“±;Ê†ó)¯–®Ó\”5Tôy–ï÷rÃV]^¢∫∞ÑnâèBA¶“zõEˇsc˘∑æ>E
+m≠˝Mºô§^~⁄ÕÚÂºöàÂM,"⁄ö§Ü@Æ«á‘çTZ+œËì÷	@l!u)	i,∂Ω£t4sLÒÌQ“s¡≤,-Ÿæ∑áz&`ƒâÁ®¬g≤ …Îm—ç°∂˘l+5l4®›SçøQU\K3F]ZssoºõY;o3À@ŸÚQFU+ß•£§0$~t;Ñ¡T:œ¢éH3nP&´:?Bò+~Î¸áö-ºf∂¸[À&DE.‘™?"'f8¢ñFM£jÊÔ(è‡UKnóCXÃœ}ì:„Â•mÙ+ì¡®≤{	⁄!å=Ÿ“[ÊâA\S∫FÇµÈ›™hüåÉ±‘%’iÓÊ µ≤u^≤ékﬁ,)YÁ°MH÷/ˇ˝/ˇ€Ôﬂ©⁄Ù˛±‰ÍÖﬂu&ÏÌ>9=8y˙êú>:<xˆå|˘’”mh¬˛62ø[‘~Ω’,'Îû∏…≥¢3Álæ[Åuûèõi0Aô "Î§µE÷-awWÖc-ò´∑=ü´∑±Ñ:é›FYt%;eô9r∆¨Qá€·ö§£û3¿næµôçcPòJÄë¿ròó\Ë≤ıïµ§Sm’n™’ƒô¿S.∆‘Õü1ö?YT'™ÆŸy¢ Œ¥#Ï¥cÏöEŸÂìÿ ê§2vÆ9ßy:\Ó|8Ã_õ+Ô≈#r«/ˆ6dÍZaı‚ƒÙB§V?Wæ∑§–WQﬂ¨põæÏñúÛA≥Ë®&ÒQºu£:vãU≤[Ìëä‚“HÏ¨€ó’$}fØeºD
+ÁòÓdNVú? 4€LÌÒjñS∫–˘ä‚“èulgôßF/ˇ¸=˘
+uö t›¸Iåô€˙ÿ“®ÍcÉ”™|œÂÁóÎ∑¢
+Ê¿ö¸15∑s“¬Ω!?Î!»€ö›»k@Ee K-!Õ{™2`ôú(SLªJOÃ,4ßÀ7èô◊S˘”ˇYöÍQ÷‘ôû´–à˛ˆ‰B,j¿2ãÂ!ãD7V”9kâçù63 …—U¡grvHˆƒ}‡ƒzYÏPè≤eÀCQ‚§@´»N·3≤pL0Wí©\ôÖNÕ‡ﬂjXÂˇä¸CSAÑc´ö)Â˚˙®DçÔºf´Oi„íõx‹êYπÉÂÕí·dÓ'¬<n@øaWûÎá†7éhdÖ†HECÄº√ îüDÉœﬁ˚   ˇˇ SJAv
