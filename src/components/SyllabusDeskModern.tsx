@@ -8,7 +8,6 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { HomeworkMaker } from "./HomeworkMaker";
 import { ProblemGuideChat } from "./ProblemGuideChat";
-import { KiaraCounselor } from "./KiaraCounselor";
 import { ConceptInfographicPoster } from "./ConceptInfographicPoster";
 import { ConceptInfographicData } from "../types";
 import { safeSavePastSessions } from "../utils/safeStorage";
@@ -27,8 +26,8 @@ interface SyllabusDeskModernProps {
   setStudentDetails: React.Dispatch<React.SetStateAction<any>>;
   activeDocument: any;
   setActiveDocument: React.Dispatch<React.SetStateAction<any>>;
-  uploadMode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet" | "kiara";
-  setUploadMode: (mode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet" | "kiara") => void;
+  uploadMode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet";
+  setUploadMode: (mode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet") => void;
   youtubeUrl: string;
   setYoutubeUrl: (url: string) => void;
   isYoutubeLoading: boolean;
@@ -94,15 +93,6 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
   const [showTopicPrompt, setShowTopicPrompt] = useState(false);
   const [directStudySubMode, setDirectStudySubMode] = useState<"choose" | "type">("choose");
   const [typedTopic, setTypedTopic] = useState("");
-
-  // Synced Performance Analytics for Kiara AI
-  const savedAnalytics = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("maestry_student_performance_analytics");
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return undefined;
-  }, []);
 
   // Visual Cheat Sheet state
   const [cheatSheetData, setCheatSheetData] = useState<ConceptInfographicData | null>(null);
@@ -926,21 +916,6 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
             <button
               type="button"
               onClick={() => {
-                setUploadMode("kiara");
-                addToast("Mode set: Kiara AI Mindset & Academic Success Counselor! 👩‍🎓", "info");
-              }}
-              className={`shrink-0 py-2 px-3 sm:px-3.5 rounded-lg sm:rounded-xl flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer text-center select-none whitespace-nowrap ${
-                uploadMode === "kiara"
-                  ? "bg-gradient-to-br from-[#008069] to-emerald-950 text-white shadow-sm font-bold scale-[1.02]"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold"
-              }`}
-            >
-              <span className="text-xs sm:text-sm">👩‍🎓</span>
-              <span className="text-[11px] sm:text-xs font-bold tracking-tight">Kiara AI</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
                 setUploadMode("cheatsheet");
                 addToast("Mode set: Visual Cheat Sheet (इन्फोग्राफिक)! ⚡", "info");
               }}
@@ -967,8 +942,6 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
               <span><strong className="text-[#0a3641]">Doubt Solver:</strong> Upload difficult questions or exam doubts to resolve on chalkboard.</span>
             ) : uploadMode === "homework" ? (
               <span><strong className="text-[#0a3641]">Home Work Maker:</strong> Instant notebook-ready step-by-step solutions formatted for your copy.</span>
-            ) : uploadMode === "kiara" ? (
-              <span><strong className="text-[#008069]">Kiara AI Counselor:</strong> Personal academic success, 24H study timetable, exam anxiety shield & memory mnemonics! 👩‍🎓</span>
             ) : (
               <span><strong className="text-amber-800">Visual Cheat Sheet:</strong> Upload chapter PDF or notes to generate a 1-page high-yield visual infographic poster.</span>
             )}
@@ -976,7 +949,7 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
         </div>
 
         {/* =========================================
-            CONTENT SOURCE CONTAINER (PROBLEM GUIDE CHAT, HOMEWORK MAKER, KIARA AI, CHEAT SHEET STUDIO, OR UPLOAD/YOUTUBE DECK)
+            CONTENT SOURCE CONTAINER (PROBLEM GUIDE CHAT, HOMEWORK MAKER, CHEAT SHEET STUDIO, OR UPLOAD/YOUTUBE DECK)
             ========================================= */}
         {uploadMode === "guide" || uploadMode === "socratic" ? (
           <div className="bg-white border border-slate-200/80 rounded-[28px] p-0 shadow-md text-left h-[calc(100vh-140px)] min-h-[580px] max-h-[920px] flex flex-col overflow-hidden">
@@ -1005,21 +978,6 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
               onClose={() => {
                 setUploadMode("explain");
                 addToast("Exited Home Work Maker", "info");
-              }}
-            />
-          </div>
-        ) : uploadMode === "kiara" ? (
-          <div className="bg-white border border-slate-200/80 rounded-[28px] p-0 shadow-md text-left h-[calc(100vh-140px)] min-h-[580px] max-h-[920px] flex flex-col overflow-hidden">
-            <KiaraCounselor
-              studentName={studentDetails.name}
-              grade={studentDetails.grade}
-              subject={studentDetails.subject}
-              board={studentDetails.board}
-              mediumOfLearning={studentDetails.mediumOfLearning}
-              analytics={savedAnalytics}
-              onClose={() => {
-                setUploadMode("explain");
-                addToast("Exited Kiara AI Counselor", "info");
               }}
             />
           </div>
@@ -1500,7 +1458,7 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
         {/* =========================================
             DIRECT BLACKBOARD STUDY LAUNCHER
             ========================================= */}
-        {uploadMode !== "homework" && uploadMode !== "guide" && uploadMode !== "cheatsheet" && uploadMode !== "kiara" && (
+        {uploadMode !== "homework" && uploadMode !== "guide" && uploadMode !== "cheatsheet" && (
           <button
             type="button"
             onClick={() => {

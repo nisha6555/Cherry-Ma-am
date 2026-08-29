@@ -2,7 +2,7 @@ import { StudentReportCardModal } from "./StudentReportCardModal";
 import { InAppBookReaderModal } from "./InAppBookReaderModal";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  User, Award, Calendar, Clock, BookOpen, Download, Trash2, 
+  User, Award, Calendar, Clock, BookOpen, Download, Trash2, Edit3, 
   Sparkles, X, LayoutGrid, FileText, Share2, Shield, Bookmark, HardDriveDownload,
   Search, ChevronRight, ChevronDown, Folder, FolderOpen, Youtube,
   Brain, ChevronLeft, HelpCircle, RefreshCw, Maximize2, Minimize2,
@@ -5320,14 +5320,17 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
           <div className={`${activeMobileSubTab === "profile" ? "flex flex-1 min-h-0" : "hidden md:flex"} w-full md:w-80 bg-slate-50 border-r border-zinc-150 p-4 sm:p-5 pb-36 sm:pb-8 flex-col justify-between overflow-y-auto md:shrink-0 select-none`}>
             <div className="space-y-5 sm:space-y-6">
               
-              {/* Profile Details section */}
-              <div>
-                <h3 className="text-[11px] uppercase font-mono font-black tracking-widest text-[#0a3641] flex items-center gap-1.5 pb-2 border-b border-zinc-200">
-                  <User className="w-3.5 h-3.5 text-teal-800" /> Student Profile
-                </h3>
-
+              {/* Profile Details section - Modern Student Identity Hero Card */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs text-left">
                 {editingProfile ? (
-                  <form onSubmit={handleUpdateProfile} className="space-y-3.5 pt-3 text-left">
+                  <form onSubmit={handleUpdateProfile} className="space-y-3 text-left">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-[#0a3641] flex items-center gap-1.5 font-mono">
+                        <Edit3 className="w-3.5 h-3.5 text-teal-700" /> Edit Profile
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-mono">ID Settings</span>
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Full Name</label>
                       <input 
@@ -5335,56 +5338,59 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                         required
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full bg-white border border-[#dae1dd] focus:border-[#0a3641] rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-700"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#0a3641] rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                        placeholder="Your Name"
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Class Grade</label>
-                      <select 
-                        value={editGrade}
-                        onChange={(e) => setEditGrade(e.target.value)}
-                        className="w-full bg-white border border-[#dae1dd] text-[#0a3641] rounded-lg px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
-                      >
-                        <option value="Class 6">Class 6</option>
-                        <option value="Class 7">Class 7</option>
-                        <option value="Class 8">Class 8</option>
-                        <option value="Class 9">Class 9</option>
-                        <option value="Class 10">Class 10</option>
-                        <option value="Class 11">Class 11</option>
-                        <option value="Class 12">Class 12</option>
-                        <option value="JEE/NEET Prep">JEE/NEET Prep</option>
-                        <option value="College Level">College Level</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Class Grade</label>
+                        <select 
+                          value={editGrade}
+                          onChange={(e) => setEditGrade(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-semibold rounded-xl px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
+                        >
+                          <option value="Class 6">Class 6</option>
+                          <option value="Class 7">Class 7</option>
+                          <option value="Class 8">Class 8</option>
+                          <option value="Class 9">Class 9</option>
+                          <option value="Class 10">Class 10</option>
+                          <option value="Class 11">Class 11</option>
+                          <option value="Class 12">Class 12</option>
+                          <option value="JEE/NEET Prep">JEE/NEET Prep</option>
+                          <option value="College Level">College Level</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Board</label>
+                        <select 
+                          value={editBoard}
+                          onChange={(e) => setEditBoard(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-semibold rounded-xl px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
+                        >
+                          <option value="CBSE">CBSE</option>
+                          <option value="ICSE">ICSE / ISC</option>
+                          <option value="UP Board">UP Board</option>
+                          <option value="MP Board">MP Board</option>
+                          <option value="Rajasthan Board">RBSE</option>
+                          <option value="Maharashtra Board">MSBSHSE</option>
+                          <option value="Bihar Board">BSEB</option>
+                          <option value="Jharkhand Board">JAC</option>
+                          <option value="Odisha Board">CHSE/BSE</option>
+                          <option value="West Bengal Board">WBBSE</option>
+                          <option value="Other State Board">Other Board</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Educational Board</label>
-                      <select 
-                        value={editBoard}
-                        onChange={(e) => setEditBoard(e.target.value)}
-                        className="w-full bg-white border border-[#dae1dd] text-[#0a3641] rounded-lg px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
-                      >
-                        <option value="CBSE">CBSE Board</option>
-                        <option value="ICSE">ICSE / ISC Board</option>
-                        <option value="UP Board">UP Board (Uttar Pradesh)</option>
-                        <option value="MP Board">MP Board (Madhya Pradesh)</option>
-                        <option value="Rajasthan Board">Rajasthan Board (RBSE)</option>
-                        <option value="Maharashtra Board">Maharashtra Board (MSBSHSE)</option>
-                        <option value="Bihar Board">Bihar Board (BSEB)</option>
-                        <option value="Jharkhand Board">Jharkhand Board (JAC)</option>
-                        <option value="Odisha Board">Odisha Board (CHSE/BSE)</option>
-                        <option value="West Bengal Board">West Bengal Board (WBBSE/WBCHSE)</option>
-                        <option value="Other State Board">Other State Board</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Medium of Learning</label>
+                      <label className="text-[10px] font-mono text-[#486a73] uppercase font-bold">Medium / Language</label>
                       <select 
                         value={editMediumOfLearning}
                         onChange={(e) => setEditMediumOfLearning(e.target.value)}
-                        className="w-full bg-white border border-[#dae1dd] text-[#0a3641] rounded-lg px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-semibold rounded-xl px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
                       >
                         <option value="Hinglish">Hinglish</option>
                         <option value="English">English</option>
@@ -5398,58 +5404,75 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                       <button
                         type="submit"
                         disabled={savingProfile}
-                        className="flex-1 bg-teal-800 hover:bg-[#0a3641] text-white text-[10px] font-black tracking-wider uppercase py-2 rounded-lg transition-all cursor-pointer shadow-xs"
+                        className="flex-1 bg-gradient-to-r from-[#0a3641] to-teal-800 hover:from-teal-900 hover:to-[#0a3641] text-white text-[10.5px] font-black tracking-wider uppercase py-2 rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
                       >
                         {savingProfile ? "Saving..." : "Save updates"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingProfile(false)}
-                        className="px-3 border border-zinc-200 text-zinc-500 hover:bg-zinc-100 text-[10px] uppercase font-bold rounded-lg transition-colors cursor-pointer"
+                        className="px-3 border border-slate-200 text-slate-600 hover:bg-slate-100 text-[10.5px] uppercase font-bold rounded-xl transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
                     </div>
                   </form>
                 ) : (
-                  <div className="space-y-3 pt-3 text-left">
-                    <div>
-                      <span className="text-[9px] font-mono text-[#486a73] uppercase block font-semibold leading-none">Full Name</span>
-                      <p className="font-extrabold text-[#0a3641] text-xs py-1 border-b border-transparent leading-relaxed">{studentName || "Cherry's Student"}</p>
+                  <div className="space-y-3">
+                    {/* Header: Avatar, Name & Edit Button */}
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {/* Student Avatar */}
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#0a3641] via-teal-800 to-emerald-600 text-white flex items-center justify-center text-base sm:text-lg font-black shadow-xs ring-2 ring-teal-500/20">
+                            {(studentName || "S").trim().charAt(0).toUpperCase()}
+                          </div>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" title="Active Scholar" />
+                        </div>
+
+                        {/* Name & Account Type */}
+                        <div className="min-w-0">
+                          <h3 className="font-black text-[#0a3641] text-sm sm:text-base leading-tight truncate">
+                            {studentName || "Cherry's Student"}
+                          </h3>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                            <span className="text-[9.5px] font-bold text-emerald-700 truncate">
+                              {currentUser?.isAnonymous ? "Guest Profile (Local)" : "Verified Scholar"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edit Button */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingProfile(true)}
+                        className="shrink-0 px-2.5 py-1.5 bg-slate-100/90 hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200/80 hover:border-teal-200 rounded-xl transition-all cursor-pointer flex items-center gap-1 text-[10px] font-bold shadow-2xs group active:scale-95"
+                        title="Edit Profile Particulars"
+                      >
+                        <Edit3 className="w-3 h-3 text-slate-500 group-hover:text-teal-700 transition-colors" />
+                        <span>Edit</span>
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[9px] font-mono text-[#486a73] uppercase block font-semibold leading-none">Grade Level</span>
-                        <p className="font-bold text-[#0a3641] text-xs mt-0.5">{grade}</p>
+                    {/* Meta Badges Grid / Tag Strip */}
+                    <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                      <div className="bg-teal-50/80 border border-teal-100/80 rounded-xl p-1.5 text-center">
+                        <span className="text-[8px] font-mono uppercase font-bold text-teal-700 block leading-tight">Class</span>
+                        <span className="text-[10.5px] font-black text-[#0a3641] block truncate mt-0.5">{grade}</span>
                       </div>
-                      <div>
-                        <span className="text-[9px] font-mono text-[#486a73] uppercase block font-semibold leading-none">Edu Board</span>
-                        <p className="font-bold text-[#0a3641] text-xs mt-0.5">{board}</p>
+
+                      <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-1.5 text-center">
+                        <span className="text-[8px] font-mono uppercase font-bold text-slate-500 block leading-tight">Board</span>
+                        <span className="text-[10.5px] font-black text-slate-800 block truncate mt-0.5">{board}</span>
+                      </div>
+
+                      <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-1.5 text-center">
+                        <span className="text-[8px] font-mono uppercase font-bold text-slate-500 block leading-tight">Medium</span>
+                        <span className="text-[10.5px] font-black text-slate-800 block truncate mt-0.5">{mediumOfLearning}</span>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[9px] font-mono text-[#486a73] uppercase block font-semibold leading-none">Language</span>
-                        <p className="font-bold text-[#0a3641] text-xs mt-0.5">{mediumOfLearning}</p>
-                      </div>
-                      <div>
-                        <span className="text-[9px] font-mono text-[#486a73] uppercase block font-semibold leading-none">Database Status</span>
-                        <p className="text-[10px] font-bold text-emerald-700 mt-0.5 capitalize flex items-center gap-1.5 truncate">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block shrink-0" />
-                          {currentUser?.isAnonymous ? "Guest Profile (Local)" : "Verified Cloud Account"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setEditingProfile(true)}
-                      className="w-full border border-dashed border-teal-800/40 hover:border-teal-700 hover:bg-teal-50/50 text-[10px] text-[#0a3641] py-2 rounded-xl transition-all cursor-pointer font-black tracking-widest uppercase text-center mt-2.5"
-                    >
-                      âœï¸ Edit particulars
-                    </button>
                   </div>
                 )}
               </div>
@@ -5488,27 +5511,31 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                   </p>
                 </div>
 
-                {/* Kiara AI Student Counselor Widget */}
-                <div className="bg-gradient-to-br from-[#06242c] via-[#09323c] to-[#04191f] text-white border border-teal-500/25 rounded-2xl p-3.5 sm:p-4 text-left space-y-2.5 shadow-sm relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-teal-400/10 rounded-full opacity-25 pointer-events-none" />
-                  <div className="flex items-center justify-between relative z-10">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-400 p-0.5 shadow-xs shrink-0 flex items-center justify-center text-sm">
+                {/* Kiara AI Student Counselor Card - Clean Modern Emerald Tinted Glass Card */}
+                <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-white border border-emerald-200/80 rounded-2xl p-3.5 text-left space-y-2.5 shadow-xs relative overflow-hidden transition-all hover:border-emerald-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-sm shadow-xs shrink-0 ring-2 ring-emerald-500/20">
                         <span>ğŸ‘©â€ğŸ“</span>
                       </div>
-                      <div>
-                        <h4 className="text-xs font-black tracking-wider text-white font-mono flex items-center gap-1.5">
-                          KIARA AI
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        </h4>
-                        <span className="text-[8px] font-mono font-bold text-teal-300 uppercase tracking-widest block">AI Mindset Counselor</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-black tracking-tight text-[#0a3641] font-mono truncate">Kiara AI</h4>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[8px] font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Online
+                          </span>
+                        </div>
+                        <span className="text-[8.5px] font-mono font-semibold text-slate-500 uppercase tracking-wider block">Mindset & Study Counselor</span>
                       </div>
                     </div>
                   </div>
-                  <p className="text-[10.5px] text-teal-100/85 leading-relaxed font-sans relative z-10">
-                    Exam stress? Timetable issues? Need mnemonics or study strategies?
+
+                  <p className="text-[10px] text-slate-600 leading-relaxed">
+                    Exam anxiety, revision routine, or mnemonics? Ask Kiara anytime.
                   </p>
-                  <div className="space-y-1.5 pt-0.5 relative z-10">
+
+                  <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -5516,20 +5543,20 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                         setActiveMobileSubTab("counselor");
                         setActiveDesktopTab("counselor");
                       }}
-                      className="w-full bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-300 hover:from-teal-300 hover:to-emerald-300 text-slate-950 text-[10.5px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98] font-mono"
+                      className="bg-[#0a3641] hover:bg-teal-900 text-white text-[10px] font-black uppercase tracking-wider py-2 px-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 shadow-xs active:scale-95"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                      <span>Chat with Kiara AI ğŸ‘©â€ğŸ“ (Full Screen)</span>
+                      <Sparkles className="w-3 h-3 text-[#c4f500]" />
+                      <span className="truncate">Chat (Full)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setIsKiaraVoiceModalOpen(true);
                       }}
-                      className="w-full bg-white/10 hover:bg-white/20 text-teal-100 text-[10px] font-bold uppercase tracking-wider py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-white/20 active:scale-[0.98]"
+                      className="bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300/80 text-[10px] font-bold uppercase tracking-wider py-2 px-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs active:scale-95"
                     >
-                      <Radio className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
-                      <span>Talk to Kiara Counselor (Live Voice ğŸ™ï¸)</span>
+                      <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+                      <span className="truncate">Live Voice ğŸ™ï¸</span>
                     </button>
                   </div>
                 </div>
@@ -9800,72 +9827,30 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                       </div>
                       <p className="text-xs font-black text-[#0a3641]">Automatic Blackboard Capture is Active</p>
                       <p className="text-[10.5px] text-[#486a73] max-w-md mx-auto leading-relaxed">
-                        Whenever Cherry Ma'am writes formulas, diagrams, or changes blackboard topics during your live classes, high-definition snapshots will automatically be captured and appear here for instant download. No manual buttons needed!
-                      </p>
-                    </div>
-                  )}
-                </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-
-        {/* Phase 4: Official Student Report Card Modal */}
-        <StudentReportCardModal
-          isOpen={isReportCardModalOpen}
-          onClose={() => setIsReportCardModalOpen(false)}
-          data={{
-            studentName: studentName || "Scholar",
-            grade: grade || "Class 10th",
-            subject: subject || "Mathematics",
-            board: board || "CBSE",
-            mediumOfLearning: mediumOfLearning || "Hinglish",
-            totalSessionsCount: pastSessions?.length || totalSessionsCount || 0,
-            totalSnapshotsCount: snapshots?.length || (sessionSnapshots?.length || 0),
-            totalQuizzesCount: quizAttempts?.length || 0,
-            masteryScore: Math.round(
-              (dashboardStats.conceptClarity +
-                dashboardStats.theoreticalCore +
-                dashboardStats.calculationPrecision +
-                dashboardStats.formulaRecall +
-                dashboardStats.socraticStamina) / 5
-            ),
-            conceptClarity: dashboardStats.conceptClarity,
-            theoreticalCore: dashboardStats.theoreticalCore,
-            calculationPrecision: dashboardStats.calculationPrecision,
-            formulaRecall: dashboardStats.formulaRecall,
-            socraticStamina: dashboardStats.socraticStamina,
-            strengths: dashboardStats.strengths || [],
-            growths: dashboardStats.growths || [],
-            recentQuizAccuracy: quizAttempts && quizAttempts.length > 0
-              ? Math.round(quizAttempts.reduce((acc, q) => acc + (q.accuracy || 0), 0) / quizAttemptsxœì=]sÛÈ‘ïù³ÌŞ†JLŠ¤>¬åZrÉ²½Vâ­¨İKÎåŠApH" %qUİS®’«lU®rµ¹«ºJî)wu•ßã?ı	×=3ø` (Êö:‹ª]‹À|öt÷t÷t÷´mêLÂéÆ÷ˆôôÉŞÎ-é]ÎG‹AèSãÕ}côÉ#œ¶gÆe³{‹4=#4,×	î¶y›äW¿"İò#ÒÛ›òiHŠùVh™†}äÎ°Ÿ¼àL,‡Ş7BãnÛL—Á&;=!PŸÊ›¥Ëä»ºJıpûV`Îƒà­pz4¥¾¿Ø_*^&u6¾ÿ½Üü!9™%;}òËğrxL[ç”|áZ&% I#¤“ùˆà`j»>yâ›üp3ió«‹õX5V 5H+xæQgi¬\R_Ë³9²İ€î/›dÿ€4<VUi; éš¸î È§Æj§~ ôsêÚ†ßHW˜øÆŠ²X¡#ÛÒíH¥†®áö—ì^êŞàT"˜AÍ:å°Rˆttf FRaÛ½ Aø„†¾eî/Ó¿°Ú’80â>išæÜ7ÌEã	L×‡W»;·ˆeº|üæëßü¥!#Gı±ëÏÇd´¿\J¸õLê…0A@ÒEŸŒŒ`Êf40hËŸe´…i@ÿ³q ™º™ïrexiÎm±ûÄ§¦…d—ï]QHn§%N)µsõ¥¯^àš>®œY‘«šùe$>cA¾Zô×ìù¹ÚÄw/T•Ä{U•Ğû³¹õå—êış8C:óB‰Eeø‰‰ØJƒ#wæÙÀBF}RÄÛ2Çğ‚©ã«Å¿Kê¤µ/ı*àKj³Õ'¬É´uäã;­CÏ#g4tİWÈa¦†ıŠ“Ú)²Tršcjİƒ
-¼H«ùààU@t„eº>/.Ó¶û
-È¶ªX'TUšÎÜ¶7äŠ8”SzÎpú>5¡·&¬YÀÚÉ‘hÁ˜S:Â’dÀ=]ß˜Ğö8!àDó¥/šûùJıüÃ%¶×ø²3ÅŞXÎˆ^^½ÜøDêÅ“fÒÇFf€‰ş"÷.›gøÁ¸~<xö´Í~¥Ûú¤ ,ü†mÀˆÔ}ô‘ø«=ŸàÍ¡ï‹¶°›ò÷¶ã(À.W‘ˆ°÷€tòcÁ‰gF’Ÿ=>SÀF›f×­Ú-Ñ­bªl{ŸûNşËUæÍ¬qhNIóçĞ¿üQşÅò)u(nÀ¹ÁHƒX³@0˜~H¢.	CÇcÃQ2xvN}ÛX(ˆsÉKDU7Âk¦FxgdsşÅvëÆØº|°@¸[2œ´¿³Ûİë_l~¼CÆ6½$à~Ğ2)‚üb„Öxıü²µÓ!Ôœú^k›;/m*[–C8·×¡	Æ°#Ë™ÄS½+S5V>ºao¯7zÄÂoõ¢?BjØ0˜ÎæV‡ø -è¨µuiÃàº0:ã²uÑšÈEkœ‚„ô2Œ¦L‘{ÑêAÙÀ3LÚZ´vùÄñ-ÓµeÌ.[Û™¹¨ëSÜWÏ³ÓV¾huwÉÿSLm;7Ç^'~Å_nw:1ìÏrˆXŠ~@F¯lÈcß»(Ælˆ=bsÃÀµç!‘cÖ2æ¡wãÍATösg¦W¡Ú[jM·Ò…Ùà.Gœ°5sø¥a¾j]XÀBşehÃK2÷@(3q×“ç¤ìˆN“?²{lUCÚœn©‡ºê{gC‚_¾1tíÌÅ°©` ƒ…2]`}	Óé”)Ô ¨oÄİn·ÕCÚÖA0ÖµMaççD´Ó½İ5""’ĞëcFĞÛ1"¦È¢Çgğ¼Ûõ._¤Wß²Ê[…0¾ãI\'ÇW&†×êÔ…Ú0'7Ÿó¯ÿğÕM,sÀ„+ì»îŒ«-8Ô#ÛôŞòÃ^°5LÒ1¨$B´ŞÑ1‹Í43‡½Hh2Àk½·?æ“ØÕÁë¯ÿ'šŠï–3Cí©‰¢¯Ï4‚ò]Ip¼ìÜ"&–€µÌ|·Cl´-Ü4p?f´N v.¨Û²ßRÜâÆÄpâù8=£Ø°¬”O7 èŒ¢…Ã5D¡†è’)µ=²pç„[D@…†…´û,á†­fJ
- )A¤x¹AĞ.“H\¨SëÊã½±16cÙ€I%2‹lÄ…@}}MK
-B6à¿/¦âÅ¨?m=ÿxû|ú"#¸ ŒA#kM­Ñˆ:iQ"Úşq›r5ì`–bùr/P|ÄU0wœìIGœÒ"_\£ÙT¨5üáš@àÎ}“Ş3F
-Z (4ƒäÅ±3v›Já±DÚÎ-Há² ‘¹Z+t[>ûî7 QoÔƒèÜ2àW·»elİ~(…ŸÌí%‹8Œş 3@`{ÔÚãòO²™$2âáşÌúğc—ı‚E»L‚Òğ‚²E:yÕ*Ú¸ÊöÒhcì"á Òt8jt›RÈßjvÇºğ¯¤-óx'¬”c<îê|óŞkïÄ»7—–²‚T"=; C i/–@ˆÑ<(!ß|ı§?’Á“ÃÓ3rúà‹ãÁñ³§e“á|¹¤DÉ'$š#˜Ì‘pÜ&ÛUô’`é$è._r~œ!€80QÄCP!Ä8àR0lH½Ü](› •|¸L‘k{8aÆÑ«—eó $´B­¯©š°š¦oyÈ{Êê–¯!ƒĞÔ.ÚB¯ªWKY×6†ÔÖ¨•¨ƒü•«#	ª€÷sÇâ ÷õ-ä"é<zÔŠv;e‚^‘×ÿüŸ„›¶¹­»+`R(cˆÏj}	&ÅÙÀ÷±ŒjÑ¿€C,k@¥Xc†Zâ½‚ßN1»,‘ç»&üIGgˆ¬ÅÀ(R´*Á ÉÁK¨pÖçü7ÚÈÌ.>9ß¹ï^8hÍ*Û	õ©‚–]Æ|îçaè:%PDã§…†Knzpé¹~ÈúÀ.ÊpIŞØ.¹Ùí)
-,ıøMlEˆ¶ØøuJ†FJáõä7Úl»ë¦Ø]„)Ï»¤Ä%í½hÿ)d‘ÑÒ`G²L"®¸~Ës­´AºãXØ@¦Ç-°Q1Î>ñR>1üWĞŠ“_Ó+œÆÚ Q”.n¼”ÍÅJ”\¦øÿ;N\=Ë+¢XÇ>öjÃq²„í² l<Ä  ƒ“û×…é\åøFØŒ›o4nlÜ8Ú3şÖû»Âz¾ ®ÏW—3Ö:SJÃq›5C»)ÔfíoÂp×„×ƒ…c’Ç°‚™Ï7­‰8	 ÷X37ìÊÃµRVF#+0†6ígÍëß‘MM²‰AÙwAË³ÂÊ<Õ¤Ø Ùb+äæÈ5ç3"qØ.‚û†ŸÂ,´8­Hf§tìÓ`zt!©*)J…"ØÒú¤Ñ c5šLIÎHCk GAEešYF:bçÄiêYÆ§ÑXB[~ŒTŠZ¼5ß™Ş!£¹Ï<-˜H[ªQŠÍL>\S~*³âm@m\¼‹“|§­r¦œ¬[Ñ÷BÑ¼ğ“ÂÄtµÑ§4‹¥OB…`æ»Àş€æCĞl '.¡mµBş……]wˆ®iL¬[ÍŒÆ¦û9åİvÊ¦Ê¼LT–3Şó86Xaqp^\ZöFÛ'Ï˜fÙ>7ì9šñWlk£=¶løÙ¼çº65œÊÆ§PMİ0î”™÷“f}„üoŸ4°f£ºƒYóÙj]ğºP#X¬ÖÖÔèÀ3±i¾n¤Ì“ù52VĞlÊ+´ÉËm’n§ƒÆìÎ'*6W×Š*ÌxËgM£üã°•ØÊuYf•mÖ ?±¿}÷¢Ü.ŠûçV¢§8añ¡~ò0y
-H24†ä©qnMë+‘œôuôØ4šuF€	Go‚İ(.bşEÙá	ë¾Rl.+VÆµ3â]@ÃCIŒ;3†ÍFÂ.t5šåKXÌ-…ô”9‡'nğ’7¨b˜JEª˜aòÙ©qÂJM¯´:AA¤Ìf-2¥e@.¢u;¥ª>}’Î?óIµŸX6âB·y¡œ«:D‚²eı—Ùk+e¬ƒo¾şÍÿjIY‡ÉÖÓ\2îsµ±>ìMQ=Îï½$‡hnZ´ûó|G
-‚şôG]R8>h2‚MÚûö‘A0ŸÍñ^’A47-2€´&îw„€OD_ı^—Ôä£µ~ß0 'ş{IlbZ9<|G$%ıE—xP
-9aö“ê“@ÑwfÁ(Qw>›Vb–2L|Äü|×.;ÔÓ~¶rMNkƒ/Ñ+êŒHÎ–Zv”Y-Ìg½ÉW›FÙy*kEy°ÿ¥å˜	-p'ÔÆ w_Ë!çuİæ¯­IS„lå›¶z9O¯Ìgl¤bv|E²&J…UÄv$n"6N•¶ÉØø¸“™^³À`¬z–,É…5
-§}òòÃ¥g†WÿğR}P=¥ÖäJ—V$‹oŒæ¡¡›IéTvÈ¸ª®Á¢§Ä*DC©Ä¸ÊÍ›?º[82øÁt> $êhvHHÎN‰p—)1¿‘„(}"ä¶'…T8	O¡‚3¤ÌÆŸqä¬†%·Ş¨‡Ú&‘ªÅÄ0Ñ¨|²Š§=§ª¢¾Æ9ïA‡­Vïq¹7†§$J±-|‡ìH "„;í¯	UçëFC6öu"áÒq•(¥;ÅÍŸ|=1,‡àîÀœ\|aÑæÙ£*U{àS,Å,¸ğ˜œ+ˆ <2ÈH6uåf¦x…c>;¼Gº}òğñáàÑÑáéıA |­=0;Uî¬˜öççe!}9!ÚrZÓÖóí=æ’€´¨Šøƒ/94äÏ:Ó-é ò£oE€iGy=¥§RÑSv:¥dxi‰ºÇB2÷¤LY¼O<O––Ç	J#S‡7îGÚËŠ‹Q<M5£ÊÄ'Éò§ç{ê¦6x¤Ê‚epÃŠ:*[ã@Šé¹° •co‘tOÀbtL‘‹€Ì\Ÿ A ¸òAeç•¸2„?%²±@ù¹ïÃ
-ãát„®ÏÅ»XÇ+ÿŸïT¢?«ÅLšo[,ú~bÈSSÙGÉDx»Ve‡¶?ø@:ZÎ;­ï™Ÿ9‹9‹hİ&0“µyÎ	ûûl
-ª^á¤
-›Ó å¼BÌ8f	§,ç…üa¡¸æ˜|cM–½kß3ÔñKºc*eÚŠa‰¯ xWÍA*ÔÍXËj`çÄ ¾”o[±øÇ* Á­Â{?xÈá¸T®=ùé^a„˜8ó«t„(ËÅõí;ø,eR©TqEÿ™åa–ß"Ü&íR˜,aÙTa»=Ç>#m]½ØÊí„Ñ4’şªŸéÔ<î<ñ×—»æïktŒmûnŠc¿ò-³×ßè¹zyUøğùö3R­Éé¢x©”=Õº‹¦*[W™Í„îdbSäB§mòDc™3ét$aNåNŒEªi. #0M²JmµZåsn"Š	Ù·9“Õm=} ò±¤ßo'-'Ê{Vá×D\áA|)øÜÅ|fş+ø½è-s×Å×ÒËêtğìÚ¾„8²'±<¶1ˆ¥Yl’nCÏ«8î™Gf'Ÿr2_]z×6Oi˜£KOøƒòÏÖ}Ğ,ïß¨²ƒú^¼-5ûkÅ(óÇ§ÇA,`§5=P3ñëøG%«È‹[BŞêENùÑ‹]öB¡ò%™xg†9âÜÍ&éá1Û ¦©m‘WjËzXçƒñ³Ç8„'ù3–Bª
-påïæ«	›†9<ºõ{jM¦6ü§¶ØÈHË'ëi…®‡ÇZ-»Â¿.Z»èè½»É-dÏ}û(¼Xª k‹«@jãÓ¢aˆ#×vı¾Ğl0ƒŸûŠji€›˜È– 	×RùUåc¶Êáv¨a—X§à¬³=ëvVCQ	ÊÙ€›T.%9ô&v„ĞÙş4ğbˆñá÷&·@Î½>Ã°şJŒÁGOÆ\¦mû<qı3B¤Ş³'<ï(ÚT„o™Æ6«/‰±+S,E‰–À$­Ü¾€;*º‘C'¸€5Ü$d@Ül}ıï_‘Ïæ4yäÛ‰ïm:[ëŒu6Ğ2¸tJàÂÙy+%%âaŠ1ü
-Š$[=<eQ=«}Ä‹¸•f¶*½ê‡è@:æ¡÷ÜÑbi¯l§º:&€”ªe(H%Weš*ªŸäEˆâA?Šò%Dd£o6i“f×Ğ9FœRàÀ>Çòóœ}‰%}—çN¿üeD™œ%qO×ûtl9¯šb¶–œ=õ¹©ˆŒ×µè°ñdVƒşÁşãm¤m·³öå¶,O¢8'Êdü™0ş!61ãÆ´Po	9´¥Ö²”ù¥¤iDSò†e	¦îELwÄËU×*m†ÂUP™öò¬2Å {ÑÚäÍ·,ÏR&«h…úæëßı°Z9ÉÎÅø¯<ptö9ƒZµ¶ö0˜ìZÌ1èuØ$ĞOÄ$‡qŠM¶w;¹LvëdŠ(8fy¢Áåäˆ÷)(Ù6l!i²Éí|j®ƒk×f•õ‰í]<¼>'Œ’uš]ªLÖÉ4 ¥l0}Œ_Çÿ³j0j›º|,R¨-Ì†(Zı„.ˆ K"bƒ©ÆäïÓWÔ¸0A>Ã¶²K±­ü’Ê±}M”J<¿sjbäÌ U’êNJb9AİZ%†Å"¼Âü6ÆŒœE@ª‰Uê¥jÏ¯Ùûxôt‹X£Ë>qæ8fsÓ…}<]@Íı%´rU`àáª:ş¢Š´“¶Öoö`j[YSUë-Â†Ö&Y³áµn¼Õg«µT­‡®2å;:ü$L
-Óˆ;ÌµØö©èX×Ì•$L¬Ì¶ƒĞõN|×3x wsCã4ï‘áµY¡¶¦	=+LÂ””†=_ÎêIjÙ£‘w8·‡«åXŠÛysŠÁ]Òxl–á'³=¥xÅ~ƒ¦şhc•C˜jÃ€Â. ë °§üdêš¡f>¬·Â—=·ÄE:u˜ª>áS—”ğQf¤Âá"»çÍ·¢¤ºÌºÀöûp¥0ö®f/÷:i‡ƒ^¡ÃAú»(]J×t ÆGwûæë¯ÿ‹<BöŞìfoJS?ºÇ’¢ô»‚Q^–ëã0d!¶d-^-ï&.ü™<ap"ÍŞ{<…Îõq!v¥Ê`C*ë·ìb•Çˆ”‹Õ»‰ÿM ´Hskı±fIV£H¥D¼…“{nˆW¤Ò İ¨#(”ÁWÃİóf’ª"’‡]¦ôò<¨òÙOµ+¿®±Øí8ÓB^®ÙÀ‘j±4Îşm‘®V{ÕlEãL8I‰©0‹¨(&ªÅr9$·¤DZš©
-Ê‚µrdİd¢Q‰bâ{÷‚ôOõ5$ş£)=÷]ç1šğó‰õCÄN0hÆW¦±ut57BıëğÏÊbßNŒ}Ye4~•wÅ^ØÆ<>VE«$)EÄøèÄªÏÛké¹±¡Ê+Ù^ìûÀTİSzN;ò”hĞ ª­ï¾[8x½èˆ8C®ı¾íD?z×v¢ÔßíH7°#1Ò}
-ÓÑ¶Z‰=ì”9n®´‰éÆ%ëIÕ?¡~Io0uıĞœ‡»§K×·¸†%k§p=™p]í(Å¡ıú_şü·¿ş–¢ájš¾xåèäşùë_ÿ+Ù$¯ı»Éù½Ğ'tsÈ2vM>ÀY¥}¨í‡•iğQªdV+5Òİìmn¥:Õœ^¥ÚV•ç¤ˆòˆôZ-ªI£xğ^Ÿ={zôàäŒ<9~zŸ<9<©%SÔ	—.vÛ½LBÂ«İÆXè½H&HÎ\×–j®+…F§OZÑ[ıZùzëø×¾‹¬NB]ıXÊ¦õú3 ƒ°wĞ‘˜ô¥¥¼´.®aÃi6¸r•…+‘X
-ZmU?5K“ƒ`:y¨¸YöÉ\!ÜÈf«z*‡bytS9ïâAÎäÑ\uånôèl¢o1dŞa¼àãûö¢Å » ÷_}+ªÑ¢J®byÊ©á›SòyÈRÄ—_ï¢É3õQ§Ü)®èqqµ$oq{¯*…˜“Z]Î,j<„®IY‘†Z}Çr¼yX›œæ°Ë*	¥íß_FÈÌ¦P¥NgB…§BŠNYõ&m‡†?¡âN€JS‹gƒH0…=ŠúûˆÜ‡¯à®šA^êˆ©HoJñÏnínš¾*Gò¸—‘$ÃLIë®9úî<dîÓ,z‹¿Jù6+(®.ŸNù]0•
-Ëòã‚+Â‚ó‰>On¤ÓÆF\RÒ›#ÿr•Š¬Nï°WÖœkg—-Fö¶ºÁŸÆbjYÍ
-j¾Şet‘6ƒÑI¼¨a {ä9×À ‘´ZÂ!ñN‹Dñ·ƒG¬É´uJròôÓ·G0†:xT\¢:q›ö÷Ô`>õ­Ù$g>-»ZX7)˜ÃÚT%{àİ6/R‘·¬`ä$üíÈõUmBò0³–Ø´ŒsÃ²ÑZˆ—pJ—Ò·ßnº+~Á=‹*‰1íĞ·fÍ²ƒÿ»|~Ñ=EM§OgÁĞ¨JM§Í™…A46Ú¡ûØ½ ş‘ĞæF`mÏGxY”<t¡¨Zİ‰éúTÄ	ŒÜhîŒ6›fä+Í†k®2‚rŸˆ²¯}¸õ¦Âš ãÿĞp¹;ùÙ#ö$õsK//–„ ÜÉGÎÖ9ïd^¥ò•§ƒÖ*6xÁ|xŒ;
-oc ~±‘•¥ãÁG+ç5Iå5Ê^UÌ™¤l±R¼“eY;IÎÁü’ÑÖj‹Ö’<krê½‰=}×5f*`íá®Y6£?±pj9k…Îµ‰ò³¶|Ñ£Z4İ®JG¤Fw°×ˆıX"…&Œÿe|bÙ¶&# #–#N+óğæt{íÄu<¨•Ùõöxv=E’·‚ìz»úÑHÈ‰I(Í©k§vĞäK¹JÈ :`p»kvÇEƒP)·™Š£W‹“VŸ8~,r^+²òÉHì×
-,*ˆÌ€zıAóza‚EAº½kÅ×-£ÍœKÈ¶o‘àd:akIÈV½Rn´"¦»À •÷f÷QF!„u‚õ¸‡2nm‰0hƒ¾@íÚ‘lJüe+Ò«ñXˆ‹llØj€ÕšáuuBæÖ3§U¬BB½*Ğ;s¤½Õ'~úàèó³ã/ÁçOş¬æ™vt3ÚŠgÚÛŠ3íbyO×8!¥4ODß@ğX^U&,c ÷£F‘ÇA»ziÏEBt#âÕ`Ji¨™;İòÒĞKcv†¯DåujÕÁD£g Hœ[ô‚Ç‡ÖõäYÁ(³›h8‰B£uq‘ÎáW&N²Ì“¬8°»šÅ¨³½×u.>š=ZƒZÙ•êÁ+–öÓÉ
-)3
-¶“«İ› «e†3†24HwvÏe÷óû$xR¡™çÓ)u÷œS &nói„Sê1X¦a“1`ÌË	; ÁÂoõ%±û©0+½È#ê»ğ“ùs×5¯$ÔJÂ±Æp”#SEbËUÓ.¼5Ú¬IòYàú‰“»Nš¯,ßÌ^T¤O¡1b¾:2&î„¡^*áC­¼suaXedNWZàX®;½Dqb	İ™„LÊ|½ìùsmù·<?E‚mƒïÇšx=I]}ÛÍõÓyÕËëXD´5I\oª.T¥µ²ˆ>a Â6BÂ¥®JF‰mï)M]S|sœôŒy°\—‰*–ïÛÃ=c4bÌs\pf²ÎÉòmİ‘¶ùl+1lÔÈİSàß-J®Åã¶¥™¹7ZÍ´·e@5ÙËh¥¬aj^:CÂàÇ7ÃXM@¥ólÃáaÆ5ÒdÇGpseæÜZî¨à5£å¿µÛÏÈ…ZõGäÄ
-Ç†­‘Óh‰šù{ºG°¬%7»CÚÔÏ|Ëp&×—¶™ĞÏ,
-£J¯%h‡0öxIoxïˆâšÒ5¢¬-ïFEëèfô¥Vd§ùX>P.•­eÉ:ÊysMÉZÆ6.Y¿ş·?şí¯¿}G¤jËûû’«W®ÿæLØÛ}rzxr|Ÿœ>8:|ü˜|öùñ?Õ4aÿrn}¹ªız«^LÖ¼q“EE§îÙ|¿ë<Ó¤œ3©<ë„ğ­yÖ]Ãî^åµb¬Şv>Voåk	uvkEÑı…2êiæÈ€Úã³ÃÕ	G=£@=Ì|;£3¼Ã0aS	pG$ ëœ	½A:¿²–4 cª-ZÍj5qÉé”É æŠ>uù;Få›Eu¼êêİ'ZÙ˜¶‡¶]=/;9ˆME$…¾sYÏ9ÍÛá¤ûá0~-—Ş‹yH×/nvEèZ†`õüÄô\¤Öå?§tß»¦ĞWß,s›¾ìßóızŞQuü£XéZyìVËd·Ş+ù£ØY¶.ë	úL?	ÉÔ¨D2÷˜î¤nVÌ_eš.¦{|êÅ”®t¿"ô}køYÊÜèõ¾"Ÿ£N„®+ßÄ˜z­O-µ²>Ö¸ èìY}¹îp²ğ§.¬‘¯©¹™›îŒØ]lkvç^.*XJ©|R•BËøF™lØUr“`
-ĞŒ3\çº©hÌ,ŸÊïÿˆÔTÒ¦Îä^…ZüwS bU« ¦YT»,]_ÁÛ9kÉ­g £+ÂÏøîô!úÈ‰´²Ú¥*°ÉX”Á8q •d'ÓH“8ÌF™d
-!³Ò­¬¯šYşo É?åŒ †;vU±Jù¾Ü+Q£Ÿ·lõQV¼Äë†œ¹-],Ÿ)'õ>şæqú½ô\?½qlÌí©ù0ïĞ4äÃGóá'ÿ  ÿÿ áG<•
+               xœì=]oÜÈ‘ï÷+Ú“½Í(ëiF«X2dÙ^ëbÙZw“œaÄ²g†1‡ä’}ìDÀ=åé²@9lî€CrOy¸Ã!¿Çàö'\Uwó£É&Ùl¯³v­!û³ºªºªºªšñütJ]zFr8¥ApI3rØÉØfsÇoË6&1ƒ¿¼€˜SÃÀç‘c˜¯FX$ò|Û‰5lwB.½y@ûŒj‡ªMíÉ´cÑ±íÚ‘í¹$t?œzQHÎmÇ!Æ<òfFd›†ã\’T4ühP‹.üçûÔŒâ˜ˆí†‘áFÄòÎ]Ç3¬.yâ‘™áÎ‡ŒæQä¹!q)µ¨uëïˆò¹³îï+?İY·ì3Õ§µ«ÂKEY©Tî{ò-ó^ü™”Y¬ÿˆœL’­y:Û¦sFs‹Â|O©ï9Dˆ{|ùÑzÚáQŒ—ÂB¬Lf@vøÔ§îŞÂseğuvä{èx!İ[´×ÈŞ>	it¤ªÒNH¥9[Fdì-PB>®'ÆŒ²?È¯~EZCsê9FĞº-Ud³ 0û‡;DD"½hš+ÎG¿¤f4ˆÿ`¥hJ>…¹â]üŞğ½áƒ\™µìùìéø1 ø<(¼a5Áæy‘áiš‡‡ŞÜ…±ùFÅ¯îvêN¢)¶Q,‹o7TÆô"ZLè'Û\;äMU7ÖÍ~6·¿úŠÆ~	¿¢ˆÎü\Õ|`64¸š^ k„°îĞ€ÕÎQHÛ2Â)ƒô02¢°kz®Iı–ØË%ù¨@P¹ò°†Ğc
+‡ğG}(h¿BsPÓFXÔ×\î”"ó©/zf€˜¿f¶k¬‘u²-ó Zò¬…1KŸsK$ P7÷=×¯ÅŞ…äf$èêK_s„)Ã©P5÷=W9
+ö…ÅjñDÌç/òlÃ;WUïUU`ÖÀLsæ¥LäÃ¥ß1Yì“¦ÜÍ’‚Tö±¹IÛmÃ4o“/K…?ÉG¤ıe×½
+…ÿ ¡®åzİí<ÌæÖåÀc¼ºo\†‚2gÆE»w›´ËXPoÆÑ_Ë% @ÑC@J^ŒA$ï¸Û¥÷ÙßíšÙ2
+v‘T:f|ƒZUÍ²e
+]É›Ô};4çaøS;šrñeo¡x™ÖYWî´ÛòÛrpD£Ğò…g›6]@O:¹$LH<».«‹õXµò-—•KËèl¹Š*Š-7³£î-Ê¶×l¶«î-Š›«TŠ‘ÏŞ"·SJó:-Ùz³…ïœ†Ñ1ÛÜ[daµq™tĞŠ‰°u›„|ÙÙ¾MlyWëÛo~ó—–Œ>ÀDï+Dï™ï;Í|³2ˆ¶ø!tŠCoæ;ÀB¬rñ*W1‘™†ÆVSÊP¹:YDH¿Jø’šÇlÈ#Ô€c‘#·sàûäè6#Ï{…fj8B•:¥@–JNsäB­{P)c5·n¯r¤–}è¼¸LÛŞ+ ÛºbE4TUi»sÇY“+âPNéÃéûÔ„Ş˜pÊÚ)hÁ˜SjaI²`ŒF^`Lhwœp¢ı2ÍıÂ‚R¿ø`íu…Ä{ÄX{c»½¸z¹öc©{LÚik¹1 &‚î›Í7‚4Ñ=òÃ§OºìW¶­—Tƒ…ÿÂplëFtløP_4ÿ«;ŸàÍA—];dÿ¶åï]×³(À®P‘Èˆ$Å±àÄs#)ÎPê-‡æ×­ÚmÑ­bªl{ŸnñK^_¾‚5Ì)iÿú—?Ê¿ø@>¥.Å¸0i+†3#@5›wI:¹ f„’ÁÓ38Æ¥‚8¼D\Up#\±¬Vt´}Î¿ØnİÛ€6QgƒŒ&ç?ØØéíöF/Ö?Ù&c‡^p?ì Œ
+Lá—ó0²Ç—ñÏ¯:ÛÄ‡š3kàw¶ˆáÚ°óÒÎ¨²c»„xÇõ\Ú’í4›€şšLõ.Ékoù±òÑú»}ë0 ¿Óÿˆ¨áÀ`6Ö77€©ÕÙ¼p`p=qÑ9ïÌ,rŞ§ ½ˆâ)„SÃòÎ;}(ú†I;—>qü_Çô³‹ÎV«hŸÉ6 ¸¯å§­.|Şéí)ş/:¦˜ÚVaıä¹µ±‘À>ôm·…ˆ¥èwdôÊ¡¡Ü9ö½ÃbÌFØ#67
+=gÑ9f´‘%İøs•ı”X°ò“¡½©Ñt3[˜î‚nÔ™y®üÒ0_uÎmà@ÿÂ‚dîƒPfâ®'ÏIÙ†Ç†)Ù=6Fª!­O7ÕCİ*u„½³!Á¯ÀyÅs>l*ÈğÒ™.´¿BÚÒĞ
+8gƒÄİívÕCÚÒA0ÖµCaççD´İû¸gÄD$¡×'Œ ·DÌEŸÏày¯ç_¼È®¾e•7Ka|Ç—¸N¯L¿Ó/©µana>1æ·ö_ÿáë;ëXfŸ	/>V8ğ¼W#:(p”Ø[Ë±ojÈ®á\²5MÒ1¨$±åû³ØqĞ@3höšğZÿí9ÃÆ$vµÿú›ÿ§€â»íàÆP{j¢èpÊwM&Qj³—ç3±¬=`æ;ÄáHÛÁM÷cF[¡á†bç‚:°í û­daâìÄ‰PàôŒ`Ã"°32D2İmˆ…Ã5D¡†è‘)u|<HÖVPG¡a!íş0.j¦¤ ’Dªó‚v™TâBZW6ï±™ÈL*‘Y\è .ôê»ìkVR²‡øÇğb*^Xƒiçù'[gÓ9¹ÀalYgj[u³¢D¼ıã6å†ìÄ©˜¥X¾ÂqÌ§{Ò!§†¬È—Ôh·j¸&zóÀ¤÷kBA …f˜¾8rÇ^[)<VHÛ…)]4ò WëD^' ãÀ›ádõ­>l@g¶¿z½Mcóã€RøÉìÓ~ºˆ£ø:v¬Î.—ÒÍ”ø ‘÷§p6€;ì_,ºUìˆFç”-ĞÉ«NÙÆUµ—Æc	fƒ£F¯´)…ü­fw¼¡óÀğ+ÚR0?€wÊúØ@9Æã®Î7ïİîv²{si)/H¥ÒÀp` í'ò Ñ	š‡•ƒ#äÛoşôG2<>8}FN|q4<zú¤j2œ/W”¨ø„Dss‚9Û„c»Š^ò ¬œD
+İÅKÂO2 d&Šx*„\f‚©—»eS ’rí&Ì8zõ²j„Dvä õ5SVÓlyOUİê5dÚ—ÚE[èUıj)ë:Æˆ:•ãM¿vu$Ağ~îš@$æŞ³í‚<P&ÇZÑîfLĞâÏ+òúŸşƒpÓ6·uW¢bLJeñY­/Á¤8˜á>–SMbúpHd¨”hÌPK¼w2ğÛ.g— òÏ„?©õ‘µeŠV-49xÎœÿÆ»™9Â'ç;÷…ˆPÙN¨O<t_©b>w¸ŸHÑøi£á’Û£\ ûë»¨Â%yG`»äzoƒLQ`$o+B¼Å&¯324R
+¯'ï¸ñf+Ø]/ÃîbLyŞÛ@JŒQPÒŞËöŸR/v$ËT â¡t|ÏÎt ;…ƒdzÜ[ãì³•,å±¼BçâšÛÑ4ÑÎ¸ ¢tyã•l.éP2È ä2Åÿ—Øq’êy(XmÌÊ8Öğ±×³“l—( iDdà!œÜ¸*Lçr,Ç÷4ÂfÜnùÖ¸¥p‚JŸ• =ãoı¿)¬çê|Eq9­c8¥4Z·Y³0´›BmÖş:wEx=¼tMòvB‚cóù:€¢3'äkæ&]yØ VÊª(À²CcäPk/o^ÿl’MÊZ]¢ÌSOJ€-!¢‘ÃÑ(±B®[9Ÿ¡¥ËvÜ7‚f¡ÅiI2;¥ã€†ÓÃsIUÉP(ÅÃ––|\0 ­¨ËÑdFrFZ9
+*ªÒÌrÒ;'ÎRÏJ0>‹ÆÚòc¤JÔâ­^ÄğtMfL¤J¬õ(Åf&	.‰)?“Yñ Ç.Şy‡I¾ÓN5SN×­ì{©h^îÔ¬8¶]kSšÅ²'¡B0¼	`H†óh6.—Ğ6;‘‹ÂÂ®;B×4&Ö-gFãFÓ½‚òn7cSe^&*Ëoƒyœ@¬°88//-{£í‘§L³ìÎœ†íä+¶µÖÛülßó<‡îZmãS¨¦nwÊÌûi³Âş··GZX³Uß÷Z^®^W£j„—Ëu55:ğMlš¯Û>Ùİ,Ûò
+­órkäG¤·±Æì«Ø\S+ª0ãmlà±|Ş4Ê?î[IL¡\—eÆPÙfòû;ğÎ«í¢¸n¦zp†–ê§“§€$#cDgö„±¾
+ÉI_GOL£yg˜pü&ŒĞâ<1àŸW°îkÅ¶èÒÇ¥`Åª¸vN¼it ‰qÏŒQ»•²]fñsS!=åÎacÁ‰¼äª¦¥RÑ*f˜>F~jœ°2Ó«¬.Ë•6k1™••¹ˆÖÛ¨Tmğ”tvù™O¦ıÔ²‘ú˜*ˆ°ªC$([Õ•½¶VÆÚÿö›ßü†‘”x˜n=íã>Wk«ÁŞEàÑãÌğßKrˆç¦E‰?Ï÷¤ HáOÔ%…Cáƒ€&#Ø¤ıï„óÙÌ.ßK2ˆç¦E°‚öÄûğ‰	áëßëÂƒš|¸2Ãï¦ôÄ/‰€ML‹b‡‡ïI€dÄ¢¿è’€ˆ¦<aö“ê“@Ùw9NZ~PİùlXMxˆYÆ0ñ!óK<§ê8POûÙ,h4­¾Ä¯¨k‘‚-µê(³^˜Ï{“/7ªóTÖŠò`ÿ+Û5SZàN¨­}î–;BÁëº/Ì_›}’¥ÙÊ7íô^%˜ÏØHÍìø8jŠäM”
+'ª˜=l#H¼Tlœ*m“‰ñq;7½:fÁX—èY² ç¶MäåßŒ®şş¥û z*­Éµ.¬HrŞ9Í1F>B7“Ê¨ìIU]ƒEO‰eˆ†R‹qµ›7t·pşä,ğÃé|@HÕÑ:ìœá.Sbq'")7Pú&ÄÈíLJ©4>pB%gH¹?çÈYKn½P!µM"u‹‰a¢QùdO{jNUE}sŞƒ[­ß;“roO)H”b[øÙ‘$ $N™A¸Óş*Puî¸j4dc_%Ş©W…ÂQ¹SÜüÉ×±a»wæäêFä›3Ï•P©Ú› Ÿ)æ’é¹‚úÁ#ƒÂ‰dSWnfŠW8æg÷Ho@>>>:<8½?,€¯µæ§Ê³şü<p¢*¤¯ DÛngÚy¾µË\Ubğ‡†üYÅÑa¶%İDş`ô­¨0İPGŞÆOå©TüTN)^V¢î³Ì])SïSÏS¥Õq‚ÒÈÔá»À‘vóâbOSÏ¨rñI²ü)Âùx™ ©²`\ãÒ°§²„ÊÖÚ—ó¡a²Ä[$Á²Sä" 3ÌS WnÕv^++C@øS!”Ÿ¬0K&Ğõ¹x— ëcå_ âóïµèÏj±Óæ»6‹¾FòÔVöQ1Ş®ÆÙa í[·¤£õç¼Óú±ñù™³˜³8€Öm3IP‡éœ°¿ŸMAÕ+Tis´\TˆÇ¬à”Õ¼?,×“oÌC²Î²×`í{†:~IwL•L[!,ñïê9Hº™hÙñAìœÀ—ñm+ÿX4¸ÕxÏó 9Êµ'‘ŞFˆ‰3¿ZñHGˆÒ°\\ß¾ƒÏB&•ZWôŸ[fùí+Âm².…é¦‘M5¶ÛøÉÑsâ3’³Ğ&ÑUñ‹ÍÂNAó(,Û¹ğ‰‘NÍ“ÎS}¹kş¾AÇØvà…™¨1ö«Ø2{]cğŸ«—WõXŸï ‡!õšœ.ŠWJùñS¯»hª²M•ÙÂñHäM&eI/¹×æ‰Æ$rg$ÒéHÊœªËTÓB& F`šd•ÙjµÊÜD1*²oq&«Ûzö@äI¿ßJ[N•÷¼Â¯‰ş:¸Âƒø2ğ¹‹ùÌ‚W˜†6$ñ[æ®‹¯¥—õèàØµ	qdObylcKó6Ø4İ†WqÒ3ÌO>?åt¾ºô®mÒ0GWñåŸÍû Ø>ß¿Qeõ½$x[j÷×šQOÂD2ÀN}jµ}P3ñë-ü£–UÅ-¡oöc§üøÅ{¡PùÒL<Š3Ãqîä“ôğ˜mPÓÔ¶‡XÈ«´ˆå=¬‹Áøùcœ	Â—ü+!U‡@¸ò÷óÕ„ÍÃ@œ	İ€úù§øOm±‘<–-IÖÓ‰<µ:v…wvĞÑ{g+—[È™öqx°TÖ=V2€46:&§E£‡ã¡Ù`?ïÕ:;Ò 7#0‘-A®•ò«Ê6Ál•ÃíHÃ.±JÁY+f=~rÖí¼†¢”ó7™\JrèMâ¡³ıiàÅãÃïMnƒ\xıÃúk1=s‘µ`ìóÄXşÛì{–à„çE›Šğ-ÓØfõ%ÑÒ veŠ¥X"ÑÂ˜¤]ØpGE7"rà†ç°†ëdˆlˆ›í¯¯ÿíkòÙœ†|;	¼‘Cg+±ÎZ—
+¸pvŞÉˆg©x˜ac¿Â2ÉVOYTÏòG‰Ã"nå„Y§íZoÅ†zç!:Nxè=Ïº\‚ƒÆFZà+[Y£®	à–Aµì %©äêLSeõÓ¼qü!èGq¾„Ø‘,gôÍ'mÒì:Çè‘S
+8ÀàX~³'±¤qàñÜÓÙ—_Æ”ÉY÷t½Ÿ\hÑÒ³µäÜøiÎMEd¼®E‡'·üğöh#khû8o€`_>–åI'“„@¹Œ"FÊ?Ä&fcÜ˜öê-!‡ƒö¢4Z–*¿”ì#hŠAŞ°,áÔ;Oèî‘x¹ìZeÍP¸
+*ÓÓnq€Uft?^›¢ù–åYÊem°Pß~ó»V"§;ÙÇ¹¢£ÿUÎ>Ç`Ğh¡VÖ“]‹9¦½›ú‰™ä(I±É¶àŞF!“İ*™"
+yhp99â}
+J¶[H(Dš|r»€¡‡w§t³ÊæÄöŠ^>¼>'Œ“uš=ªLÖÉ4 ¥|0}ŒßÄÿ³n0j›º|,Rª-ÌF(Zı„^–DÄS)Èß!¦¯¨qn\†ÅÛÊb,Å¶òK&Çö5Q*õü.l¨©‘3‡Viª;)‰eìu3h•Ëğ
+óÛ3ò,RC¬R/Uwføí6^qÄÎ“oÛºw£a67]Ø'ÓÔÜ[@+W%6 ®ªã/ªè@;ikóf÷‘¶•5SµÙ"¬im’^éÆ[¶ÚHÕzèyS¾ãÃOÂ¤00¤Ã<Q‹=AaŸŠ€uÍ\iÒÉÔÊLái7Œ<ÿ$ğ|ƒr·×4NóŞØ^‘jšÀñÑ³Â¤LIihĞóå¬Ÿ¤–á1yGsg´\¥¤‘§± ÜÅ;æ,Êğ“YˆP<‰b¿AS´¶Ì!L½a@aĞuX‰S~2MÍP³ Ö[áËŠ[â"&LUŸŒğiJJø(3Ráp‘]‰óæÛqÒ]f]b{N|¸R˜xW³—»Y‡ƒ~©ÃAö»,]J×t ÆGwûö›oş“<BöŞîåoJS?ºÇ’¢ô»‚q^–ëã0ä!±ä-%^-ï&.ü™38‘vÿ½ÆBçú¸¸Rå°!“õ[v±*bDÆÅêİÄ‰ÿ" Z¤½¹zŒX±$«Q¤Ö"ÙÂÉ=/Â+2i€nÔ”GÊ‚à«áîy³Iu‘éÃ.Szyî×ùì§Ú„_×Xîvœk¡(H7làP5DgÿvHO«½z¶¢q&œ¦ÄT˜…E4Çub…’›R"-ÍTUÁÆZ9òn2ñ¨D1×‹ğ½wN-ıS}‰ÿpJÏÏ}Œ&übâAı±ıšñæµi,D]MãPÿ*ü³òØ·`_^M^¥Ç]I€—¶1eÑ*MJÑ 1>:±†êóöFznâ_¨òŠ@¶—ø>0U÷”QÃ‰=%ÚC4€jë»ï^oº#"Îk¿o;ÑGïÚN”€úûév$FºO`:ÚV+±‡2ÇÍ¥61İ¸d=©ú'ô’_ÒN½ 2çQÈîéÒõ-n`ÉÚ.]O&\×;Jqh¿şç?ÿß_K†ñp5M_¼r|rÿüõ¯ÿ…¬“×¿şİ‹ôü^èº9
+ä;‡&à¬2>ÔöÃÊ5ø(Ó2«¥é­÷×73jN¯Vm«ËsRÆyDz£ÕÇ¤q<x@Ÿ>9|pòŒ=¹ONF…ÇÉõCÂ¥‹İv.Òğz·1z/’	’gçŒ*5×¥B£³'­è­~­|½MüßEÖ$¡®~,eÓzı™ÑAXƒ;èHLúÒRQZ×°á´[Ü¹ÎÂ•H,­¶ªŸšeÇÉA0›<TÜ‚,{‚ä®nå³ÀÕ=UC±:º©šwñ gòh®ºr7~t6Ñ7‹2ï0^ğñ}wÑbˆ]ûF ¾ˆ•?õhQ'W±<åÔÌ)ù<d)â«¯wÑä™¥‰ú¨[íWv¸¸Z’·¸µ[—BOÌI­.ç5	B×@†¤,ˆHC­¾c»ş<ªÁMNsØeÏÒöï-bdfS¨Óƒ€N§†;¡ÂS!C§¬z›v##˜Pq'@­©Åw@$˜ÂEƒ½VDîCˆWp×Í (uHÄT¦7eøïtvA7Í^•#y\‰ËHÒaf¤uÏœ‡o1÷i½Å_e‰|‹×WO§ú.˜Z…åFùqÉaáÙDŸ'·²icc.)éÍ±¹JEV§wØ‰Á+kÎ³ËV#[İğ‹O1µªf5_ï2ºX›Áè$^Ô0½òİk`HZ-áx§‹E¢øÛÁ£GödÚ9¥!9yòé[Ç#C<*/QŸ¸MGû{âY ˜OÛ"ëäY@«®ÖM
+æ²6UIÁÄx·Ë‹Ô$Cã-+;	7r}Õ›|Ì¬%ö_-ãÌ°´â%œÒ¥ôİ·›îŠ_0D­'bQ%1¦ö¬]uğ—Ï/¾§¨íˆá^24ªRÛí2Bfa­µnä=öÎiph„´½ÖX;s/‹’Ç“-´Uë;1½€Š¸3‘kİĞ›ÑvÛŒ}¥ÙpÍeFPíQõuÀ·ÚTX¤süaB.w§?ûÄ™d~nêåÅ’„;™ãÈÙ:ÌëT¾êtaĞZíÁo!œpGámÅ/6²ªôbüÑb"øhå¼&©£¼FÙÒ²Ê9“”"QŠ·ó,k;Í9X¼@2ŞZÑZšgbEN½7‘£ ¯ïñºÂL¬=ÜÁ5Ëæô'N-g­Ğ¹6Q~V–"~ôC‹¦[u‰#“ˆÔøö±¤Ğ”ñ¿Œ#‚OlÇ1ĞddÄrÄieb^Ÿn­<‚¸‰µ2»Ş.Ï®§HòV’]oG?	91I ¥9uíÔÚ±ƒ|)—	TnõÌŞ¸,`*…âöcCyÔàrqÒêÇODÎkEV>	
+!ƒƒFE%ƒ9P¯>h^/L°,H·­øºE¼™séÙöm,Ğ$l-YÃªWÊVÄt—´
+áŞì>Ê8„°I° ÷PÆ2°-]Ğ¨Ó8’M‰¿lEú"Kq‘[m°Ú0¼®IÈÜ*cæ´ŠÕH¨W•zg´7äÁÏ~şìè‹døùññÁéÏiÇ7£-y¦½¥8Ó.—÷tbPJóDüÅUmÂò$z/n9p´«—ö\$ÔÈ6"^§”Fš¹Óm?Û ½0fÏğ•¨¼J²~!øƒhô‰3›óøĞ¦<KevR'Uh´..Ò9üÊÅIVy’•v×³u¶÷¦ÎÅ‡SÃÇ¡ÇkĞ(»R3x%Ò~v#Y"eFÉvcµc`µÌp†ÂPf‚éÍîyìşo~ŸO*4ó:¥ îQb
+À$Ía>hJ= Û42Œ‚y¹‘á„$¼tá[hE-v?f¥yD~2ßbîºæâ•„ZI8V‚rdÊqêHl±lÚ…·F›©S>\=qr×IóÕ¡˜ù‹Šô)4¡QLÀwB-câMêe>4Ê;×†uf@æt¥ÅªÓK”'–ĞMñ‘KÈ¤ÌGÑÏŸ?7–«óS¤ØÖÚÿA¢‰7“ÔÕ·İ\?W±¼‰ED[“ÔÈõö¡úBuZ+‹èÖ	 l#"\êªe¤±ØöòÑÌ5Å7ÇIŸ1–ë2QÅò}w¸g‚FŒyKÎLVÀ9Y¾-£gi›Ï6SÃFƒÜ=%Şø½²äZÜ˜1îºPš™{ãÕÌÚy›YT#½Œ–Ê¦æ¥ã$1$~|3ŒÑT:ß1\fÜ MVy|7WæÎ­åš^3Zş;»MğŒ\¨UHNìhl89¨™¿§{ËZr³;ÄCƒèY`îäúÒ6óú¹MaTÙµíÆ,éï‰A\SºFôá‚µíß¨hßŒƒ¾ÔŠì4ŸÈÊ•²µ,YÇ9o®)YËØÆ%ë×ÿúÇÿûëoß©Úöÿ¶äê¥ë¿9öÖ€œœİ'§?&Ÿ}~ôMØ_Îí¯–µ_o6‹Ézƒ7n²¨èÌ=›ï—càbš”s&•g°¾5ÏºkØİëÜ±–ŒÕÛ*Æê-}-¡ÎÁn£(º¿F"ÍRgÜav¸&á¨Ï(P3ßÎè/Æ0LØTBÜ	€Ã>cBo˜Í¯¬%è˜jËV³^M\p:e2€¹¤O]ñQùfQ¯ºf÷‰Ö6¦ía§íc×ÌËNbSI©ï\ŞsNóv8é~8Œ_+¤÷bÒõ‹ë=º–#X=?1=©UùÏ)İ÷®)ô•ä7ËİÇ¦/»%·Àü ™wTÿ(VºQ»å2Ù­öJEşhvV­Ëj‚>³OJ2*‘Ü=¦Û™›‹W™f‹éÃŸf1¥Kİ¯È}_Ç~–27zı‡¯Éç¨Ó„‘çÉ71f^ëSK£¬n#(;{Vß_®;Ü’,ü™käkjnæ¦…;»ë!”mÍŞÜoÀE…K%#•Oª2h™Ü(“»JoÌ šq†ë\7™åSùıÿ‘šêAÖÔ™Ş«Ğˆÿ®@,kÀ4‹j—E¢ë+øqÁZ2ÃF›€ÄèÊğ3¹;${cˆ>râ­,w©‡
+l2å0Nh%ÙÉu#Ç¤³q&™RÈ,ukë«a–ÿHòE9#hà]W¬V¾¯öJÔèç-[}”…/ñº!wîHËçŠ%ÃÉ¼Oş„y\~C/|/ˆ@os'Ejnæ˜&|ôh>úñÿ  ÿÿ >4’
