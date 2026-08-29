@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   X, BookOpen, Sparkles, Download, Copy, Check, ChevronLeft, ChevronRight, 
@@ -473,8 +474,10 @@ export const InAppBookReaderModal: React.FC<InAppBookReaderModalProps> = ({
     mono: "font-mono tracking-tight text-[13.5px]",
   }[fontFamily];
 
-  return (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-0 sm:p-3 md:p-5 animate-fade-in select-none">
+  if (!isOpen || !book) return null;
+
+  const readerModalNode = (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[9999] p-0 sm:p-3 md:p-5 animate-fade-in select-none">
       <div 
         className={`w-full ${
           isFullscreen ? "max-w-none h-full rounded-none" : "max-w-7xl h-full sm:h-[95vh] rounded-none sm:rounded-3xl"
@@ -1131,6 +1134,11 @@ export const InAppBookReaderModal: React.FC<InAppBookReaderModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined") {
+    return createPortal(readerModalNode, document.body);
+  }
+  return readerModalNode;
 };
 
 function escapeRegex(string: string) {
