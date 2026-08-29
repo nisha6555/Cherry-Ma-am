@@ -40,6 +40,7 @@ interface ClassroomBoardProps {
   onTogglePause?: () => void;
   pauseTeaching?: () => void;
   resumeTeaching?: () => void;
+  speechSpeed?: number;
 }
 
 interface ChalkboardTopicBlockProps {
@@ -56,6 +57,7 @@ interface ChalkboardTopicBlockProps {
   cherryVolume: number;
   latestSpeech?: string;
   isPaused: boolean;
+  speechSpeed?: number;
   activeBlockRef?: React.Ref<HTMLDivElement> | null;
 }
 
@@ -73,6 +75,7 @@ const ChalkboardTopicBlockComponent: React.FC<ChalkboardTopicBlockProps> = ({
   cherryVolume,
   latestSpeech,
   isPaused,
+  speechSpeed = 1.0,
   activeBlockRef,
 }) => {
   const cleanHeader = cleanTopicHeader(topicText, detectedSubject, idx);
@@ -162,6 +165,7 @@ const ChalkboardTopicBlockComponent: React.FC<ChalkboardTopicBlockProps> = ({
               isFallback={false}
               isPaused={isCurrent ? isPaused : false}
               teachingPhase={isCurrent ? teachingPhase : "completed"}
+              speechSpeed={speechSpeed}
             />
           ) : isCurrent ? (
             <div className="py-6 px-4 rounded-xl bg-black/30 border border-emerald-500/15 text-center space-y-2 animate-pulse">
@@ -201,6 +205,7 @@ const ChalkboardTopicBlock = React.memo(ChalkboardTopicBlockComponent, (prevProp
   // Active topic checks
   if (prevProps.teachingPhase !== nextProps.teachingPhase) return false;
   if (prevProps.isPaused !== nextProps.isPaused) return false;
+  if (prevProps.speechSpeed !== nextProps.speechSpeed) return false;
   if (prevProps.state !== nextProps.state) return false;
   if (prevProps.customBoardContent !== nextProps.customBoardContent) return false;
   if (prevProps.lessonTitle !== nextProps.lessonTitle) return false;
@@ -239,6 +244,7 @@ export const ClassroomBoard: React.FC<ClassroomBoardProps> = ({
   onTogglePause,
   pauseTeaching,
   resumeTeaching,
+  speechSpeed = 1.0,
 }) => {
   const [activeBoardContent, setActiveBoardContent] = useState("");
   const [isBoardTagActive, setIsBoardTagActive] = useState(false);
@@ -1383,6 +1389,7 @@ export const ClassroomBoard: React.FC<ClassroomBoardProps> = ({
                       cherryVolume={cherryVolume}
                       latestSpeech={latestSpeech}
                       isPaused={isPaused || false}
+                      speechSpeed={speechSpeed}
                       activeBlockRef={isCurrent ? activeBlockRef : null}
                     />
                   );
@@ -1401,6 +1408,7 @@ export const ClassroomBoard: React.FC<ClassroomBoardProps> = ({
                   isAcademicNotes={state === "disconnected"}
                   isPaused={isPaused}
                   teachingPhase={teachingPhase || "intro"}
+                  speechSpeed={speechSpeed}
                 />
               </div>
             </div>

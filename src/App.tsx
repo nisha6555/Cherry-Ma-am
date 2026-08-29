@@ -113,7 +113,7 @@ export default function App() {
 
   // Document-driven teaching system states
   const [activeDocument, setActiveDocument] = useState<{ filename: string; mimeType: string; markdown: string; mode?: string; detectedSubject?: string } | null>(null);
-  const [uploadMode, setUploadMode] = useState<"guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet">("explain");
+  const [uploadMode, setUploadMode] = useState<"guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet" | "kiara">("explain");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedButWaitingWakeup, setUploadedButWaitingWakeup] = useState(false);
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);
@@ -132,7 +132,7 @@ export default function App() {
       return [];
     }
   });
-  const sessionSnapshottedTopics = useRef<Set<string>>(new Set());
+  const sessionSnapshottedTopics = useRef<Map<string, number>>(new Map());
 
   // YouTube Course Explanation states
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -254,8 +254,26 @@ export default function App() {
   const [dialogueHistory, setDialogueHistory] = useState<Array<{ id: string; sender: "user" | "cherry"; text: string }>>([]);
   const [typedInput, setTypedInput] = useState("");
   const [showSpeedControl, setShowSpeedControl] = useState(false);
+  const speedPopoverRef = useRef<HTMLDivElement | null>(null);
   const subtitlesScrollRef = useRef<HTMLDivElement | null>(null);
   const portraitTranscriptScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Close speed popover on click outside (supporting mouse, touch, and pointer events)
+  useEffect(() => {
+    const handleClickOutside = (e: Event) => {
+      if (speedPopoverRef.current && !speedPopoverRef.current.contains(e.target as Node)) {
+        setShowSpeedControl(false);
+      }
+    };
+    if (showSpeedControl) {
+      document.addEventListener("pointerdown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("pointerdown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showSpeedControl]);
 
   // Trigger floating notifications
   const addToast = useCallback((message: string, type: "info" | "success" | "error") => {
@@ -589,12 +607,35 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [customBoardContent, topicBoardsContent, topics, studentDetails.subject, sessionId, user]);
 
+  // Helper to test if whiteboard content is substantial & academically complete (Anti-Adha-Adhura Gate)
+  const isBoardContentComplete = useCallback((content: string) => {
+    if (!content || !content.trim()) return false;
+    const clean = content
+      .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/[#*`_📌💡❓⚡]/g, "")
+      .trim();
+    const lines = clean.split("\n").map((l) => l.trim()).filter((l) => l.length > 3);
+    
+    // If it's merely an intro placeholder, a raw single question, or fewer than 2 meaningful lines without math
+    const hasMathOrDiagram = content.includes("<svg") || content.includes("$$") || content.includes("\\[") || content.includes("\\frac");
+    const hasRulesOrDerivation = /Rule\s*\d+|Step\s*\d+|Formula|Theorem|Definition|Derivation|Proof|Example/i.test(content);
+    
+    if (lines.length < 2 && !hasMathOrDiagram && !hasRulesOrDerivation) {
+      return false;
+    }
+    
+    // Must have at least 80 characters of academic substance or multiple formatted lines
+    return lines.length >= 3 || content.trim().length >= 90 || hasMathOrDiagram || hasRulesOrDerivation;
+  }, []);
+
   // Helper to synthesize a high-definition blackboard snapshot matching the exact live classroom screen
   const generateFallbackChalkboardImage = useCallback(async (
     topicTitle: string,
     content: string,
     boardBg: string,
-    defaultSubject: string
+    defaultSubject: string,
+    topicIndexNum: number = 0
   ): Promise<string> => {
     try {
       const canvas = document.createElement("canvas");
@@ -657,28 +698,47 @@ export default function App() {
       ctx.roundRect(22, 22, canvas.width - 44, canvas.height - 44, 12);
       ctx.stroke();
 
-      // 3. Top Header Bar (Matching live screen TOPIC 1 • Cherry Ma'am Live 1-on-1 Classroom)
+      // 3. Top Header Bar (Matching live screen TOPIC X • Cherry Ma'am Live 1-on-1 Classroom)
       const headerY = 55;
       
-      // Topic Badge Pill
+      // Dynamic Topic Badge Pill
+      const topicPillLabel = `TOPIC ${topicIndexNum + 1}`;
+      ctx.font = "bold 13px monospace";
+      const pillW = Math.max(92, ctx.measureText(topicPillLabel).width + 26);
+
       ctx.fillStyle = "rgba(196, 245, 0, 0.22)";
       ctx.beginPath();
-      ctx.roundRect(46, headerY - 18, 92, 28, 6);
+      ctx.roundRect(46, headerY - 18, pillW, 28, 6);
       ctx.fill();
       ctx.strokeStyle = "rgba(196, 245, 0, 0.4)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(46, headerY - 18, 92, 28, 6);
+      ctx.roundRect(46, headerY - 18, pillW, 28, 6);
       ctx.stroke();
 
       ctx.fillStyle = "#c4f500";
-      ctx.font = "bold 13px monospace";
-      ctx.fillText("TOPIC 1", 62, headerY + 1);
+      ctx.fillText(topicPillLabel, 58, headerY + 1);
 
       // Classroom Brand Title
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText("🎙️ Cherry Ma'am Live 1-on-1 Classroom", 154, headerY + 2);
+      ctx.font = "bold 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      const cleanTitleText = topicTitle ? topicTitle.replace(/^[#*\s📌]+/, "").slice(0, 38) : "Live Classroom";
+      ctx.fillText(`🎙️ ${cleanTitleText}`, 54 + pillW + 10, headerY + 2);
+
+      // Subject Badge Pill on Top Right
+      ctx.fillStyle = detectedSub.bg || "rgba(250, 204, 21, 0.2)";
+      ctx.beginPath();
+      ctx.roundRect(canvas.width - 170, headerY - 18, 124, 28, 6);
+      ctx.fill();
+      ctx.strokeStyle = detectedSub.color || "#facc15";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(canvas.width - 170, headerY - 18, 124, 28, 6);
+      ctx.stroke();
+
+      ctx.fillStyle = detectedSub.color || "#facc15";
+      ctx.font = "bold 12px monospace";
+      ctx.fillText(`${detectedSub.icon} ${detectedSub.name.slice(0, 11)}`, canvas.width - 158, headerY + 1);
 
       // Subtle horizontal divider under header
       ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
@@ -727,23 +787,24 @@ export default function App() {
         .filter((l) => l.length > 0 && !l.startsWith("<") && !l.includes("</"));
 
       const textStartX = 54;
+      const maxTextWidth = canvas.width - 110;
       let currentY = 125;
 
       for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (currentY > canvas.height - 90) break;
 
-        const isHeading = (line.toUpperCase() === line && line.length > 3 && line.length < 40) || line.endsWith("?");
-        const isRuleCard = /^(Rule \d+|\d+\.\s*Rule|Step \d+)/i.test(line);
+        const isHeading = (line.toUpperCase() === line && line.length > 3 && line.length < 50) || line.endsWith("?");
+        const isRuleCard = /^(Rule \d+|\d+\.\s*Rule|Step \d+|Theorem|Key Concept|Formula)/i.test(line);
         const isBulletExample = line.startsWith("•") || line.startsWith("-") || line.toLowerCase().includes("example :");
 
         if (isHeading) {
           ctx.fillStyle = "#ffffff";
           ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-          ctx.fillText(line, textStartX, currentY);
+          ctx.fillText(line.slice(0, 60), textStartX, currentY);
           currentY += 36;
         } else if (isRuleCard) {
-          // Draw highlighted card container for Rules (like Rule 1, Rule 2 on live board)
+          // Draw highlighted card container for Rules & Theorems
           ctx.fillStyle = "rgba(6, 78, 59, 0.28)";
           ctx.beginPath();
           ctx.roundRect(textStartX - 10, currentY - 24, canvas.width - (textStartX * 2) + 20, 42, 10);
@@ -757,12 +818,13 @@ export default function App() {
           // Green number badge
           ctx.fillStyle = "#34d399";
           ctx.font = "bold 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-          ctx.fillText(line.substring(0, 10), textStartX, currentY + 3);
+          const badgePrefix = line.slice(0, 12);
+          ctx.fillText(badgePrefix, textStartX, currentY + 3);
 
           // Yellow text for rule body
           ctx.fillStyle = "#fef08a";
           ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-          ctx.fillText(line.substring(10), textStartX + 95, currentY + 3);
+          ctx.fillText(line.slice(12, 75), textStartX + 105, currentY + 3);
           currentY += 54;
         } else if (isBulletExample) {
           // Bullet point in neon emerald
@@ -789,11 +851,11 @@ export default function App() {
 
             ctx.fillStyle = "#38bdf8"; // Cyan formula text
             ctx.font = "bold 16px monospace, sans-serif";
-            ctx.fillText(formulaPart, textStartX + 127, currentY);
+            ctx.fillText(formulaPart.slice(0, 48), textStartX + 127, currentY);
           }
           currentY += 46;
         } else {
-          // Regular text with keywords in bright yellow
+          // Regular text with keywords in bright yellow and word wrapping
           ctx.fillStyle = "rgba(244, 244, 245, 0.95)";
           ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
           
@@ -809,10 +871,27 @@ export default function App() {
             ctx.fillStyle = "#facc15"; // Bold Yellow
             ctx.font = "bold 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
             ctx.fillText("indeterminate form .", textStartX + 295, currentY);
+            currentY += 34;
           } else {
-            ctx.fillText(line, textStartX, currentY);
+            // Word wrapping for regular chalkboard text
+            const words = line.split(" ");
+            let lineBuffer = "";
+            for (let wIdx = 0; wIdx < words.length; wIdx++) {
+              const testLine = lineBuffer ? `${lineBuffer} ${words[wIdx]}` : words[wIdx];
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > maxTextWidth && wIdx > 0) {
+                ctx.fillText(lineBuffer, textStartX, currentY);
+                currentY += 32;
+                lineBuffer = words[wIdx];
+              } else {
+                lineBuffer = testLine;
+              }
+            }
+            if (lineBuffer) {
+              ctx.fillText(lineBuffer, textStartX, currentY);
+              currentY += 34;
+            }
           }
-          currentY += 34;
         }
       }
 
@@ -854,10 +933,15 @@ export default function App() {
     }
   }, []);
 
-  // Automatically capture the whiteboard content as a snapshot for a given topic
+  // Automatically capture the whiteboard content as a comprehensive snapshot for a given topic
   const autoCaptureSnapshot = useCallback(async (topicIndex: number, boardContent: string, isManual = false) => {
     const currentUser = auth.currentUser || user;
     if (!boardContent || !boardContent.trim()) return;
+
+    // Quality gate: do not auto-capture "adha adhura" intermediate chunks
+    if (!isManual && !isBoardContentComplete(boardContent)) {
+      return;
+    }
 
     const topicContent = topics[topicIndex] || "";
     let topicTitle = `Topic ${topicIndex + 1}`;
@@ -865,7 +949,6 @@ export default function App() {
 
     if (topicContent) {
       const lines = topicContent.split("\n");
-      // Find the first non-empty line as a heading candidate
       for (const line of lines) {
         const trimmed = line.replace(/[#*📌$]/g, "").trim();
         if (trimmed) {
@@ -874,7 +957,6 @@ export default function App() {
         }
       }
       
-      // Extract a short description
       let descCandidate = "";
       for (let i = 1; i < lines.length; i++) {
         const lineVal = lines[i].replace(/[#*📌$]/g, "").trim();
@@ -892,10 +974,16 @@ export default function App() {
       topicDescription = topicDescription.substring(0, 87) + "...";
     }
 
-    // Capture unique snapshots based on topic title & content length so we don't spam duplicate snapshot calls
-    const key = `${topicTitle}_${boardContent.trim().length}`;
-    if (!isManual && sessionSnapshottedTopics.current.has(key)) return;
-    sessionSnapshottedTopics.current.add(key);
+    // Deterministic topic key for 1-topic = 1-snapshot rule
+    const topicKey = `topic_${topicIndex}_${topicTitle.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 25)}`;
+    
+    // Prevent duplicate capture if content length is nearly identical
+    const contentLen = boardContent.trim().length;
+    const lastLen = sessionSnapshottedTopics.current.get(topicKey) || 0;
+    if (!isManual && Math.abs(contentLen - lastLen) < 30 && lastLen > 0) {
+      return;
+    }
+    sessionSnapshottedTopics.current.set(topicKey, contentLen);
 
     try {
       const boardBg = THEME_CONFIGS[theme]?.primary || "#0c201a";
@@ -911,7 +999,7 @@ export default function App() {
         .trim();
 
       // Ensure DOM has actually rendered substantial content (not an empty slate or early typewriter cursor)
-      const isDomReady = slateEl && textWithoutHeaders.length >= Math.min(50, boardContent.trim().length * 0.4);
+      const isDomReady = slateEl && textWithoutHeaders.length >= Math.min(80, boardContent.trim().length * 0.7);
 
       if (isDomReady && slateEl) {
         try {
@@ -961,7 +1049,8 @@ export default function App() {
           topicTitle,
           boardContent,
           boardBg,
-          studentDetails.subject || "Mathematics"
+          studentDetails.subject || "Mathematics",
+          topicIndex
         );
       }
 
@@ -971,7 +1060,7 @@ export default function App() {
 
       const newSnapshot = {
         id: `snap_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        snapshotId: `auto_snap_${Date.now()}`,
+        snapshotId: `auto_snap_${sessionId ? sessionId.replace(/[^a-zA-Z0-9]/g, "_") : "sess"}_top_${topicIndex}`,
         userId: effectiveUid,
         topicTitle,
         description: topicDescription,
@@ -982,10 +1071,15 @@ export default function App() {
         timestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 }
       };
 
-      // Add to local state so guests and users have immediate access during the session
-      setSessionSnapshots((prev) => [newSnapshot, ...prev.filter((s) => s.snapshotId !== newSnapshot.snapshotId)]);
+      // In-place Master Replacement for Same Topic: 1 Lecture Topic = 1 Complete Snapshot
+      setSessionSnapshots((prev) => {
+        const filtered = prev.filter(
+          (s) => !(s.topicIndex === topicIndex || s.topicTitle?.trim().toLowerCase() === topicTitle.trim().toLowerCase())
+        );
+        return [newSnapshot, ...filtered];
+      });
 
-      // Save locally to multiple resilient cache keys with capping to protect quota
+      // Save locally to multiple resilient cache keys with in-place topic replacement
       const saveToLocal = (cacheKey: string) => {
         try {
           const cachedStr = localStorage.getItem(cacheKey);
@@ -993,9 +1087,11 @@ export default function App() {
           if (cachedStr) {
             try { localSnaps = JSON.parse(cachedStr); } catch (_) {}
           }
-          const filtered = localSnaps.filter((s) => s.snapshotId !== newSnapshot.snapshotId);
-          // Keep at most 15 snapshots locally to avoid storage quota overflow
-          const bounded = [newSnapshot, ...filtered].slice(0, 15);
+          // Deduplicate by topicIndex or topicTitle
+          const filtered = localSnaps.filter(
+            (s) => !(s.topicIndex === topicIndex || s.topicTitle?.trim().toLowerCase() === topicTitle.trim().toLowerCase())
+          );
+          const bounded = [newSnapshot, ...filtered].slice(0, 20);
           safeSetItem(cacheKey, JSON.stringify(bounded));
         } catch (storageErr) {
           console.warn(`Could not save snapshot to localStorage key ${cacheKey}:`, storageErr);
@@ -1006,11 +1102,12 @@ export default function App() {
       saveToLocal("snapshots_local_guest_student");
       saveToLocal("all_board_snapshots");
 
-      // For authenticated cloud users, also persist to Firestore
+      // For authenticated cloud users, persist with deterministic topic document ID so it replaces partial drafts
       if (effectiveUid !== "local_guest_student" && !effectiveUid.startsWith("local_")) {
         try {
-          const snapRef = collection(db, "studentProfiles", effectiveUid, "boardSnapshots");
-          await addDoc(snapRef, {
+          const docId = `snap_${sessionId ? sessionId.replace(/[^a-zA-Z0-9]/g, "_") : "sess"}_top_${topicIndex}`;
+          const snapDocRef = doc(db, "studentProfiles", effectiveUid, "boardSnapshots", docId);
+          await setDoc(snapDocRef, {
             snapshotId: newSnapshot.snapshotId,
             userId: effectiveUid,
             topicTitle,
@@ -1020,7 +1117,7 @@ export default function App() {
             grade: studentDetails.grade || "Class 10",
             topicIndex: topicIndex,
             timestamp: serverTimestamp()
-          });
+          }, { merge: true });
         } catch (dbErr) {
           console.warn("Could not sync snapshot to firestore database:", dbErr);
         }
@@ -1029,13 +1126,13 @@ export default function App() {
       addToast(
         isManual 
           ? `Chalkboard snapshot saved of "${topicTitle}"! 📸📘`
-          : `Automatically captured whiteboard for topic: "${topicTitle}"! 📸☁️`, 
+          : `Captured complete whiteboard notes for: "${topicTitle}"! 📸☁️`, 
         "success"
       );
     } catch (err) {
       console.warn("Whiteboard snapshot capture failed:", err);
     }
-  }, [topics, addToast, theme, user, studentDetails.subject, generateFallbackChalkboardImage]);
+  }, [topics, addToast, theme, user, studentDetails.subject, generateFallbackChalkboardImage, isBoardContentComplete, sessionId]);
 
   // Handle manual/instant save snapshots triggered by onClick handler on active Blackboard
   const handleManualSaveSnapshot = useCallback(async () => {
@@ -1047,16 +1144,16 @@ export default function App() {
   }, [activeTopicIndex, customBoardContent, autoCaptureSnapshot, addToast]);
 
   // Automatic snapshot trigger that takes a screenshot of the blackboard 
-  // after writing stabilizes (e.g., 5 seconds of inactivity)
+  // after writing stabilizes (7 seconds of inactivity) and content is fully complete
   useEffect(() => {
-    if (!customBoardContent || !customBoardContent.trim()) return;
+    if (!customBoardContent || !customBoardContent.trim() || !isBoardContentComplete(customBoardContent)) return;
 
     const delayDebounceFn = setTimeout(() => {
       autoCaptureSnapshot(activeTopicIndex, customBoardContent);
-    }, 5000); // 5 seconds debounce to ensure writing has completed
+    }, 7000); // 7 seconds debounce so Cherry Ma'am completes whole derivation before capturing
 
     return () => clearTimeout(delayDebounceFn);
-  }, [customBoardContent, activeTopicIndex, autoCaptureSnapshot]);
+  }, [customBoardContent, activeTopicIndex, autoCaptureSnapshot, isBoardContentComplete]);
 
   const handleLoadPastSession = async (sess: any) => {
     try {
@@ -1261,16 +1358,18 @@ export default function App() {
 
   const activeColors = THEME_CONFIGS[theme] || THEME_CONFIGS.cherry;
 
-  // Automatic snapshot trigger when teaching phase transitions (e.g. concept, example, doubt, transition, complete)
+  // Automatic snapshot trigger when teaching phase reaches conclusion/transition of a topic
   useEffect(() => {
-    if (customBoardContent && customBoardContent.trim().length > 30 && teachingPhase && teachingPhase !== "intro") {
-      autoCaptureSnapshot(activeTopicIndex, customBoardContent);
+    if (customBoardContent && isBoardContentComplete(customBoardContent) && teachingPhase) {
+      if (["transition", "graduation", "completed", "quiz"].includes(teachingPhase)) {
+        autoCaptureSnapshot(activeTopicIndex, customBoardContent);
+      }
     }
-  }, [teachingPhase, activeTopicIndex, customBoardContent, autoCaptureSnapshot]);
+  }, [teachingPhase, activeTopicIndex, customBoardContent, autoCaptureSnapshot, isBoardContentComplete]);
 
   // Slide player transitions and Cherry notifications (seamless, in-place, no disconnects!)
   const handleNextTopic = useCallback(() => {
-    if (customBoardContent && customBoardContent.trim()) {
+    if (customBoardContent && isBoardContentComplete(customBoardContent)) {
       autoCaptureSnapshot(activeTopicIndex, customBoardContent);
     }
     setActiveTopicIndex((prev) => {
@@ -1282,10 +1381,10 @@ export default function App() {
       }
       return nextIndex;
     });
-  }, [topics, addToast, activeTopicIndex, customBoardContent, autoCaptureSnapshot, topicBoardsContent]);
+  }, [topics, addToast, activeTopicIndex, customBoardContent, autoCaptureSnapshot, topicBoardsContent, isBoardContentComplete]);
 
   const handlePrevTopic = useCallback(() => {
-    if (customBoardContent && customBoardContent.trim()) {
+    if (customBoardContent && isBoardContentComplete(customBoardContent)) {
       autoCaptureSnapshot(activeTopicIndex, customBoardContent);
     }
     setActiveTopicIndex((prev) => {
@@ -1297,7 +1396,7 @@ export default function App() {
       }
       return prevIndex;
     });
-  }, [addToast, activeTopicIndex, customBoardContent, autoCaptureSnapshot, topicBoardsContent]);
+  }, [addToast, activeTopicIndex, customBoardContent, autoCaptureSnapshot, topicBoardsContent, isBoardContentComplete]);
 
 
 
@@ -2107,33 +2206,6 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
         id="studyverse-mobile-frame"
         className="relative w-full h-[100dvh] md:h-[860px] md:w-[410px] md:max-w-md bg-[#04110e] md:rounded-[44px] md:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95),0_0_0_12px_#1c2825,0_0_0_13px_#121b19,0_0_30px_5px_rgba(196,245,0,0.12)] flex flex-col overflow-hidden z-10 border border-teal-500/10 transition-all duration-500"
       >
-        {/* Mobile Status Bar (iOS/Android Style) */}
-        <div className={`w-full h-8 bg-black/40 backdrop-blur-md px-5 flex items-center justify-between shrink-0 select-none z-30 border-b border-white/[0.04] font-mono text-[10px] font-bold text-white/90 ${currentScreen === "classroom" ? "landscape:hidden" : ""}`}>
-          <div className="flex items-center space-x-1">
-            <span>12:00 PM</span>
-          </div>
-          {/* Dynamic Island Notch */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-24 h-4.5 bg-black rounded-full hidden md:flex items-center justify-center border border-white/[0.08] z-40">
-            <div className="w-1.5 h-1.5 bg-[#c4f500] rounded-full animate-pulse mr-auto ml-2" />
-            <span className="text-[7px] text-[#c4f500]/90 font-black uppercase tracking-widest mr-2 leading-none">STUDYVERSE</span>
-          </div>
-          <div className="flex items-center space-x-1.5 text-white/80">
-            {/* Cell signal bar */}
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2 22h20V2z" />
-            </svg>
-            {/* WiFi */}
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 21l-12-12c4-4 10-6 12-6s8 2 12 6l-12 12z" />
-            </svg>
-            {/* Battery percentage */}
-            <span className="text-[8px] opacity-75 font-sans mr-0.5">100%</span>
-            <div className="w-4.5 h-2.5 border border-white/40 rounded-xs p-0.5 flex items-center">
-              <div className="w-full h-full bg-[#c4f500] rounded-2xs" />
-            </div>
-          </div>
-        </div>
-
         {/* The App Main Viewport wrapper */}
         <div className="flex-1 flex flex-col relative overflow-hidden min-h-0 bg-[#f4f7f5] text-[#0a3641]">
           {/* Inner ambient gradients of the active study theme */}
@@ -2706,7 +2778,7 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
           
           {/* Subtle Mobile Top HUD - Sleek, Clean, Modern Light Header Bar matching Study Desk */}
           <header 
-            className={`w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-2 sm:px-5 py-1.5 sm:py-2.5 flex items-center justify-between gap-1 sm:gap-4 z-20 shrink-0 font-sans select-none transition-all duration-300 shadow-2xs overflow-x-auto no-scrollbar ${
+            className={`w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-2 sm:px-5 py-1.5 sm:py-2.5 flex items-center justify-between gap-1 sm:gap-4 z-20 shrink-0 font-sans select-none transition-all duration-300 shadow-2xs ${
               isFullScreenBoard ? "hidden" : "landscape:hidden"
             }`}
           >
@@ -2872,17 +2944,50 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
                   })}
                 </div>
 
-                {/* Voice Playback Speed Control Slider Popover */}
-                <div className="relative shrink-0 flex items-center">
+                {/* Voice Playback & Blackboard Writing Speed Control Group */}
+                <div className="relative shrink-0 flex items-center bg-white border border-slate-200/90 rounded-xl shadow-2xs p-0.5" ref={speedPopoverRef}>
+                  {/* Step Slower Button (1-Tap Quick Slow) */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const presets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+                      const lower = [...presets].reverse().find((p) => p < speechSpeed - 0.01) ?? 0.5;
+                      setSpeechSpeed(lower);
+                      addToast(`Teaching speed slowed to ${lower}x 🐢`, "info");
+                    }}
+                    disabled={speechSpeed <= 0.5}
+                    className="w-6 h-7 xs:w-6.5 xs:h-7.5 sm:w-7.5 sm:h-8.5 rounded-lg text-slate-600 hover:text-[#0a3641] hover:bg-slate-100 active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer flex items-center justify-center transition-all font-mono font-black text-xs"
+                    title="Slow Down Teaching Speed (Dheema)"
+                  >
+                    -
+                  </button>
+
+                  {/* Main Speed Indicator & Popover Toggle */}
                   <button
                     onClick={() => setShowSpeedControl(!showSpeedControl)}
-                    className={`h-8 xs:h-8.5 sm:h-10 px-2 xs:px-2.5 rounded-xl text-slate-700 hover:bg-slate-100 hover:border-slate-300 active:scale-95 cursor-pointer transition-all duration-200 flex items-center gap-1 bg-white border border-slate-200/90 shadow-2xs font-mono text-[11px] font-bold ${
-                      speechSpeed !== 1.0 ? "text-[#0a3641] bg-[#c4f500]/20 border-[#0a3641]/30 font-black" : ""
+                    className={`h-7 xs:h-7.5 sm:h-8.5 px-1.5 xs:px-2 rounded-lg text-slate-700 hover:bg-slate-100 active:scale-95 cursor-pointer transition-all duration-200 flex items-center gap-1 font-mono text-[10.5px] xs:text-[11px] font-black ${
+                      speechSpeed !== 1.0 ? "text-[#0a3641] bg-[#c4f500]/30 font-black" : ""
                     }`}
-                    title="Adjust Voice Playback Speed (0.5x - 2.0x)"
+                    title="Cherry Ma'am Teaching Speed (Fast / Slow) - Click for all controls"
                   >
                     <Gauge className={`w-3.5 h-3.5 ${speechSpeed !== 1.0 ? "text-[#0a3641]" : "text-slate-500"}`} />
                     <span className="leading-none">{speechSpeed}x</span>
+                  </button>
+
+                  {/* Step Faster Button (1-Tap Quick Fast) */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const presets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+                      const higher = presets.find((p) => p > speechSpeed + 0.01) ?? 2.0;
+                      setSpeechSpeed(higher);
+                      addToast(`Teaching speed increased to ${higher}x ⚡`, "info");
+                    }}
+                    disabled={speechSpeed >= 2.0}
+                    className="w-6 h-7 xs:w-6.5 xs:h-7.5 sm:w-7.5 sm:h-8.5 rounded-lg text-slate-600 hover:text-[#0a3641] hover:bg-slate-100 active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer flex items-center justify-center transition-all font-mono font-black text-xs"
+                    title="Speed Up Teaching Speed (Tez)"
+                  >
+                    +
                   </button>
 
                   <AnimatePresence>
@@ -2892,57 +2997,95 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.95 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute right-0 top-12 z-50 bg-white rounded-2xl p-3.5 shadow-2xl border border-slate-200/90 w-64 text-left space-y-3"
+                        className="fixed sm:absolute right-2 sm:right-0 top-14 sm:top-12 z-[100] bg-white rounded-2xl p-4 shadow-2xl border border-slate-200/90 w-[calc(100vw-1rem)] sm:w-80 text-left space-y-3.5 max-w-[340px] pointer-events-auto"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#0a3641]">
-                            <Gauge className="w-3.5 h-3.5 text-[#0a3641]" />
-                            <span>Voice Playback Speed</span>
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-[#0a3641]">
+                            <Gauge className="w-4 h-4 text-[#0a3641]" />
+                            <span>Teaching & Voice Speed</span>
                           </div>
-                          <span className="font-mono text-xs font-black px-2 py-0.5 rounded-full bg-[#0a3641] text-[#c4f500]">
-                            {speechSpeed}x
+                          <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded-full bg-[#0a3641] text-[#c4f500] shadow-2xs">
+                            {speechSpeed}x {speechSpeed < 0.9 ? "🐢 Dheema" : speechSpeed > 1.2 ? "⚡ Tez" : "🎯 Normal"}
                           </span>
                         </div>
 
-                        {/* Slider Control */}
-                        <div className="space-y-1.5">
-                          <input
-                            type="range"
-                            min="0.5"
-                            max="2.0"
-                            step="0.1"
-                            value={speechSpeed}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value);
-                              setSpeechSpeed(val);
-                            }}
-                            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0a3641]"
-                          />
-                          <div className="flex justify-between text-[9px] font-mono text-slate-400 font-bold px-0.5">
+                        {/* Slider Control with Step Adjusters */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const next = Math.max(0.5, Number((speechSpeed - 0.1).toFixed(2)));
+                                setSpeechSpeed(next);
+                              }}
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-all active:scale-95"
+                              title="Decrease by 0.1x"
+                            >
+                              -0.1x
+                            </button>
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="2.0"
+                              step="0.05"
+                              value={speechSpeed}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                setSpeechSpeed(val);
+                              }}
+                              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0a3641]"
+                            />
+                            <button
+                              onClick={() => {
+                                const next = Math.min(2.0, Number((speechSpeed + 0.1).toFixed(2)));
+                                setSpeechSpeed(next);
+                              }}
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-all active:scale-95"
+                              title="Increase by 0.1x"
+                            >
+                              +0.1x
+                            </button>
+                          </div>
+                          <div className="flex justify-between text-[9.5px] font-mono text-slate-500 font-bold px-0.5">
                             <span>0.5x (Slow)</span>
                             <span>1.0x (Normal)</span>
-                            <span>2.0x (Fast)</span>
+                            <span>1.5x (Fast)</span>
+                            <span>2.0x (Max)</span>
                           </div>
                         </div>
 
-                        {/* Quick Presets */}
-                        <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100">
-                          {[0.75, 1.0, 1.25, 1.5, 2.0].map((spd) => (
-                            <button
-                              key={spd}
-                              onClick={() => {
-                                setSpeechSpeed(spd);
-                                addToast(`Cherry Ma'am speaking speed set to ${spd}x 🎙️⚡`, "info");
-                              }}
-                              className={`px-1.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
-                                speechSpeed === spd
-                                  ? "bg-[#0a3641] text-[#c4f500] shadow-xs scale-105"
-                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              }`}
-                            >
-                              {spd}x
-                            </button>
-                          ))}
+                        {/* Quick Preset Buttons */}
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Quick Presets:</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              { spd: 0.75, label: "0.75x Slow 🐢" },
+                              { spd: 1.0, label: "1.0x Normal 🎯" },
+                              { spd: 1.25, label: "1.25x Fast ⚡" },
+                              { spd: 1.5, label: "1.5x Turbo 🚀" },
+                              { spd: 1.75, label: "1.75x Rapid 💨" },
+                              { spd: 2.0, label: "2.0x Max 🔥" },
+                            ].map(({ spd, label }) => (
+                              <button
+                                key={spd}
+                                onClick={() => {
+                                  setSpeechSpeed(spd);
+                                  addToast(`Teaching speed set to ${spd}x 🎙️⚡`, "info");
+                                }}
+                                className={`px-2 py-1.5 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer text-center ${
+                                  speechSpeed === spd
+                                    ? "bg-[#0a3641] text-[#c4f500] shadow-sm scale-102 ring-2 ring-[#0a3641]/20"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-teal-50/80 border border-teal-200/60 text-[9.5px] text-[#0a3641] font-mono leading-relaxed">
+                          💡 <strong>Live Synchronized:</strong> Cherry Ma'am ki voice speed aur chalkboard handwriting typing dono live update hoti hain.
                         </div>
                       </motion.div>
                     )}
@@ -3062,6 +3205,7 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
                   onTogglePause={togglePauseTeaching}
                   pauseTeaching={pauseTeaching}
                   resumeTeaching={resumeTeaching}
+                  speechSpeed={speechSpeed}
                 />
               ) : state === "connecting" ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-2 bg-[#0c201a] blackboard-chalk m-1.5 rounded-lg min-h-[220px]">
@@ -3100,6 +3244,7 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
                   onTogglePause={togglePauseTeaching}
                   pauseTeaching={pauseTeaching}
                   resumeTeaching={resumeTeaching}
+                  speechSpeed={speechSpeed}
                 />
               )}
 

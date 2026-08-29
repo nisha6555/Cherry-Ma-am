@@ -86,13 +86,77 @@ export function useLiveSession({
   const [userTranscript, setUserTranscript] = useState<LiveTranscription>({ text: "", finished: true });
   const [cherryTranscript, setCherryTranscript] = useState<LiveTranscription>({ text: "", finished: true });
 
-  // Voice playback speed multiplier (0.5x to 2.0x)
-  const [speechSpeed, setSpeechSpeed] = useState<number>(1.0);
-  const speechSpeedRef = useRef<number>(1.0);
+  // Voice playback speed multiplier (0.5x to 2.5x)
+  const [speechSpeed, setSpeechSpeedState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("cherry_speech_speed");
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 2.5) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return 1.0;
+  });
+  const speechSpeedRef = useRef<number>(speechSpeed);
 
-  useEffect(() => {
-    speechSpeedRef.current = speechSpeed;
-  }, [speechSpeed]);
+  // Dynamic live speed changer that immediately takes effect on ongoing and queued audio
+  const setSpeechSpeed = useCallback((newSpeedVal: number) => {
+    const clamped = Math.max(0.5, Math.min(2.5, Number(newSpeedVal.toFixed(2))));
+    const oldSpeed = speechSpeedRef.current || 1.0;
+    speechSpeedRef.current = clamped;
+    setSpeechSpeedState(clamped);
+
+    try {
+      localStorage.setItem("cherry_speech_speed", String(clamped));
+    } catch (e) {}
+
+    // 1. Instantly update playbackRate of all currently active AudioBufferSourceNodes
+    if (playbackCtxRef.current) {
+      const ctx = playbackCtxRef.current;
+      activeSources.current.forEach((src) => {
+        try {
+          src.playbackRate.setValueAtTime(clamped, ctx.currentTime);
+          src.playbackRate.value = clamped;
+        } catch (e) {
+          try {
+            src.playbackRate.value = clamped;
+          } catch (err) {}
+        }
+      });
+
+      // 2. Adjust scheduled nextStartTimeRef proportionally so subsequent audio chunks have zero gaps or collisions
+      if (nextStartTimeRef.current > ctx.currentTime && oldSpeed > 0 && clamped > 0) {
+        const remainingScheduledTime = nextStartTimeRef.current - ctx.currentTime;
+        nextStartTimeRef.current = ctx.currentTime + (remainingScheduledTime * (oldSpeed / clamped));
+      }
+    }
+
+    // 3. Inform live AI session of student pace preference if active
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        const paceDesc = clamped < 0.9 
+          ? "Slower pace (explain patiently step-by-step with extra clarity)" 
+          : clamped > 1.2 
+          ? "Faster pace (crisp, brisk and energetic)" 
+          : "Standard natural pace";
+        const promptData = {
+          realtimeInput: {
+            mediaChunks: [
+              {
+                mimeType: "text/plain",
+                data: btoa(`[TEACHING SPEED ADJUSTED TO ${clamped}x: ${paceDesc}]`),
+              },
+            ],
+          },
+        };
+        wsRef.current.send(JSON.stringify(promptData));
+      } catch (err) {
+        console.warn("[useLiveSession] Failed sending speed update hint:", err);
+      }
+    }
+  }, []);
 
   const wsRef = useRef<WebSocket | null>(null);
   const cherryTurnIdRef = useRef<string | null>(null);

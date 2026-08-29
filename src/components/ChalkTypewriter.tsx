@@ -12,6 +12,7 @@ interface ChalkTypewriterProps {
   isFallback?: boolean;
   isPaused?: boolean;
   teachingPhase?: string; // e.g. "intro", "concept", "example", "doubt", "transition", "graduation"
+  speechSpeed?: number;   // 0.5x to 2.5x teaching speed multiplier
 }
 
 /**
@@ -198,6 +199,7 @@ const ChalkTypewriterComponent: React.FC<ChalkTypewriterProps> = ({
   isFallback = false,
   isPaused = false,
   teachingPhase = "intro",
+  speechSpeed = 1.0,
 }) => {
   const sanitizedInputText = sanitizeRawBoardData(text || "");
 
@@ -217,6 +219,11 @@ const ChalkTypewriterComponent: React.FC<ChalkTypewriterProps> = ({
   const latestSpeechRef = useRef(latestSpeech);
   const isPausedRef = useRef(isPaused);
   const teachingPhaseRef = useRef(teachingPhase);
+  const speechSpeedRef = useRef(speechSpeed || 1.0);
+
+  useEffect(() => {
+    speechSpeedRef.current = speechSpeed || 1.0;
+  }, [speechSpeed]);
 
   useEffect(() => {
     teachingPhaseRef.current = teachingPhase;
@@ -573,6 +580,17 @@ const ChalkTypewriterComponent: React.FC<ChalkTypewriterProps> = ({
           } else {
             charsPerStep = 1;
             baseDelay = 28;
+          }
+        }
+
+        // Scale typing cadence proportionally with user's selected teaching speed
+        const currentSpeed = speechSpeedRef.current || 1.0;
+        if (currentSpeed !== 1.0 && currentSpeed > 0) {
+          baseDelay = Math.max(6, Math.round(baseDelay / currentSpeed));
+          if (currentSpeed >= 1.4) {
+            charsPerStep = Math.max(2, Math.round(charsPerStep * 1.5));
+          } else if (currentSpeed <= 0.75) {
+            charsPerStep = 1;
           }
         }
 

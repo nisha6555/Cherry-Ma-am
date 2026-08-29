@@ -1,3 +1,4 @@
+import { StudentReportCardModal } from "./StudentReportCardModal";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   User, Award, Calendar, Clock, BookOpen, Download, Trash2, 
@@ -1119,24 +1120,37 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
     return subject || "Science";
   };
 
-  // Combine Firestore snapshots and memory session snapshots for guest compatibility
+  // Combine Firestore snapshots and memory session snapshots with Intelligent Topic-Level Deduplication
   const allSnapshots = useMemo(() => {
     const combined: BoardSnapshot[] = [];
     const pushIfUnique = (s: any) => {
-      const exists = combined.some((fb) => fb.snapshotId === s.snapshotId || (fb.topicTitle === s.topicTitle && fb.imgData === s.imgData));
-      if (!exists) {
-        combined.push({
-          id: s.id || `snap_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          snapshotId: s.snapshotId || s.id || `snap_${Date.now()}`,
-          userId: s.userId,
-          topicTitle: s.topicTitle || "Classroom Board Snapshot",
-          description: s.description || "Interactive calculation whiteboard screenshot.",
-          imgData: s.imgData,
-          subject: inferSnapshotSubject(s),
-          grade: s.grade || grade || "Class 10",
-          topicIndex: typeof s.topicIndex === "number" ? s.topicIndex : undefined,
-          timestamp: s.timestamp
-        });
+      if (!s || !s.imgData) return;
+      const sub = inferSnapshotSubject(s);
+      // Look for existing snapshot of the same topic (by snapshotId, topicIndex, or topicTitle within subject)
+      const existingIdx = combined.findIndex((fb) => 
+        fb.snapshotId === s.snapshotId || 
+        (typeof s.topicIndex === "number" && typeof fb.topicIndex === "number" && fb.topicIndex === s.topicIndex && fb.subject?.toLowerCase() === sub.toLowerCase()) ||
+        (fb.topicTitle?.trim().toLowerCase() === (s.topicTitle || "").trim().toLowerCase() && fb.subject?.toLowerCase() === sub.toLowerCase())
+      );
+
+      const normalized: BoardSnapshot = {
+        id: s.id || `snap_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        snapshotId: s.snapshotId || s.id || `snap_${Date.now()}`,
+        userId: s.userId,
+        topicTitle: s.topicTitle || "Classroom Board Snapshot",
+        description: s.description || "Interactive calculation whiteboard screenshot.",
+        imgData: s.imgData,
+        subject: sub,
+        grade: s.grade || grade || "Class 10",
+        topicIndex: typeof s.topicIndex === "number" ? s.topicIndex : undefined,
+        timestamp: s.timestamp
+      };
+
+      if (existingIdx >= 0) {
+        // Replace with the updated / latest version for this topic
+        combined[existingIdx] = normalized;
+      } else {
+        combined.push(normalized);
       }
     };
 
@@ -3804,6 +3818,26 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
     return metrics.reduce((min, m) => (m.score < min.score ? m : min), metrics[0]);
   }, [dashboardStats]);
 
+  // Persist synced performance analytics for Kiara Counselor & Live Voice across all views
+  useEffect(() => {
+    try {
+      const statsPayload = {
+        conceptClarity: dashboardStats.conceptClarity,
+        theoreticalCore: dashboardStats.theoreticalCore,
+        calculationPrecision: dashboardStats.calculationPrecision,
+        formulaRecall: dashboardStats.formulaRecall,
+        socraticStamina: dashboardStats.socraticStamina,
+        strengths: dashboardStats.strengths || [],
+        growths: dashboardStats.growths || [],
+        totalQuizzes: quizAttempts?.length || 0,
+        classesCompleted: pastSessions?.length || 0,
+        snapshotsSaved: snapshots?.length || 0,
+        lowestMetric: lowestMetric,
+      };
+      safeSetItem("maestry_student_performance_analytics", JSON.stringify(statsPayload));
+    } catch (e) {}
+  }, [dashboardStats, quizAttempts?.length, pastSessions?.length, snapshots?.length, lowestMetric]);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -5517,7 +5551,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
               </div>
             </div>
 
-            {activeDesktopTab === "counselor" ? (
+            {(activeDesktopTab === "counselor" || activeMobileSubTab === "counselor" || isKiaraFullScreenOpen) ? (
               <div className="flex-1 min-h-[620px] text-left">
                 <KiaraCounselor
                   studentName={studentName}
@@ -5543,6 +5577,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                   onClose={() => {
                     setActiveDesktopTab("stats");
                     setActiveMobileSubTab("profile");
+                    setIsKiaraFullScreenOpen(false);
                   }}
                 />
               </div>
@@ -6474,9 +6509,23 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                     {task.label}
                                   </span>
                                 </div>
-                                <span className="text-[9px] font-mono text-zinc-400 shrink-0 uppercase">
-                                  {isDone ? "Completed" : "Pending"}
-                                </span>
+                                {task.id === "sun-1" && !isDone ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsKiaraVoiceModalOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 rounded-lg text-[10px] font-mono font-bold shrink-0 flex items-center gap-1 shadow-xs cursor-pointer active:scale-95"
+                                  >
+                                    <Sparkles className="w-3 h-3 text-amber-300" />
+                                    <span>Call Kiara ğŸ™ï¸</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[9px] font-mono text-zinc-400 shrink-0 uppercase">
+                                    {isDone ? "Completed" : "Pending"}
+                                  </span>
+                                )}
                               </div>
                             );
                           })}
@@ -9675,6 +9724,67 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
       </div>
     </div>
 
+        {/* Phase 4: Official Student Report Card Modal */}
+        <StudentReportCardModal
+          isOpen={isReportCardModalOpen}
+          onClose={() => setIsReportCardModalOpen(false)}
+          data={{
+            studentName: studentName || "Scholar",
+            grade: grade || "Class 10th",
+            subject: subject || "Mathematics",
+            board: board || "CBSE",
+            mediumOfLearning: mediumOfLearning || "Hinglish",
+            totalSessionsCount: pastSessions?.length || totalSessionsCount || 0,
+            totalSnapshotsCount: snapshots?.length || (sessionSnapshots?.length || 0),
+            totalQuizzesCount: quizAttempts?.length || 0,
+            masteryScore: Math.round(
+              (dashboardStats.conceptClarity +
+                dashboardStats.theoreticalCore +
+                dashboardStats.calculationPrecision +
+                dashboardStats.formulaRecall +
+                dashboardStats.socraticStamina) / 5
+            ),
+            conceptClarity: dashboardStats.conceptClarity,
+            theoreticalCore: dashboardStats.theoreticalCore,
+            calculationPrecision: dashboardStats.calculationPrecision,
+            formulaRecall: dashboardStats.formulaRecall,
+            socraticStamina: dashboardStats.socraticStamina,
+            strengths: dashboardStats.strengths || [],
+            growths: dashboardStats.growths || [],
+            recentQuizAccuracy: quizAttempts && quizAttempts.length > 0
+              ? Math.round(quizAttempts.reduce((acc, q) => acc + (q.accuracy || 0), 0) / quizAttempts.length)
+              : 85,
+            studyStreakDays: Math.max(1, (pastSessions?.length || 1) + 2),
+            retentionCriticalCount: retentionEngineData?.criticalCount || 0,
+            retentionMasteredCount: retentionEngineData?.masteredCount || 0,
+          }}
+          onDiscussWithCherry={onDiscussWithCherry}
+        />
+
+        {/* Phase 5: Kiara AI Live Voice Strategy & Counselor Modal */}
+        <KiaraLiveVoiceModal
+          isOpen={isKiaraVoiceModalOpen}
+          onClose={() => setIsKiaraVoiceModalOpen(false)}
+          studentName={studentName || "Scholar"}
+          grade={grade || "Class 10"}
+          board={board || "CBSE"}
+          subject={subject || "Mathematics"}
+          lowestMetric={lowestMetric || { name: "Accuracy", score: 65, icon: "ğŸ¯" }}
+          performanceData={{
+            conceptClarity: dashboardStats.conceptClarity,
+            theoreticalCore: dashboardStats.theoreticalCore,
+            calculationPrecision: dashboardStats.calculationPrecision,
+            formulaRecall: dashboardStats.formulaRecall,
+            socraticStamina: dashboardStats.socraticStamina,
+            strengths: dashboardStats.strengths || [],
+            growths: dashboardStats.growths || [],
+            totalQuizzes: quizAttempts?.length || 0,
+            classesCompleted: pastSessions?.length || 0,
+            snapshotsSaved: snapshots?.length || 0,
+            lowestMetric: lowestMetric,
+          }}
+        />
+
         {/* Smart Revision Deck Interactive Overlay Modal */}
         {activeRevisionSession && (
           <div className="fixed inset-0 bg-[#06181b]/95 flex items-center justify-center z-50 p-0 md:p-4 animate-fade-in select-none">
@@ -9701,115 +9811,30 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                     <p className="flex items-center gap-2">
                       <span className="text-teal-400">âœ“</span> Generating visual concept map
                     </p>
-                    <p className="flex items-center gap-2">
-                      <span className="text-amber-400 animate-pulse">âŸ³</span> Compiling flashcard recall deck
-                    </p>
-                  </div>
-                  <p className="text-xs text-teal-100/60 leading-relaxed font-sans max-w-xs mx-auto">
-                    Cherry Ma'am is preparing custom interactive flashcards and conceptual mind maps to help you master this session's topics.
-                  </p>
-                </div>
-              </div>
-            ) : revisionDeckData ? (
-              <div className="bg-[#f8fafc] border-0 md:border border-slate-200/80 md:rounded-3xl w-full max-w-7xl h-full md:h-[94vh] flex flex-col overflow-hidden shadow-2xl relative transition-all">
-                
-                {/* Header of Revision Center */}
-                {(() => {
-                  const sourceBadge = getSourceBadgeInfo(activeRevisionSession);
-                  return (
-                    <div className="bg-gradient-to-r from-[#0d2d2a] via-[#113a37] to-[#0c2e2c] border-b border-emerald-800/20 text-white px-4 py-2 sm:px-6 sm:py-3.5 flex items-center justify-between shrink-0">
-                      <div className="text-left space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="bg-amber-400 text-slate-950 text-[8.5px] font-black tracking-widest uppercase py-0.5 px-2 rounded-md shadow-2xs">
-                            ğŸ§  SMART REVISION
-                          </span>
-                          
-                          {/* Context Source Badge */}
-                          <span 
-                            className={`text-[9.5px] font-mono font-bold px-2.5 py-0.5 rounded-md border flex items-center gap-1.5 shadow-2xs ${sourceBadge.bgClass}`}
-                            title={sourceBadge.description}
-                          >
-                            <span>{sourceBadge.icon}</span>
-                            <span>{sourceBadge.label}</span>
-                          </span>
-
-                          <span className="text-[9.5px] font-mono font-bold text-teal-300 truncate hidden sm:inline">
-                            {activeRevisionSession.subject || subject} â€¢ Class {grade}
-                          </span>
-                        </div>
-                        <h3 className="text-xs sm:text-sm md:text-base font-black truncate max-w-xs sm:max-w-md md:max-w-xl text-teal-50">
-                          {activeRevisionSession.processedTitle}
-                        </h3>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
-                        {/* Download Study Pack Notes */}
-                        <button
-                          onClick={handleExportStudyPack}
-                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-amber-300 hover:text-white px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
-                          title="Download Markdown Study Pack Notes with formulas and cards"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span className="hidden md:inline">Export Notes</span>
-                        </button>
-
-                        {/* Print / Save as PDF */}
-                        <button
-                          onClick={() => handleDownloadMindMap("pdf")}
-                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-teal-200 hover:text-white px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
-                          title="Print or Save PDF Revision Sheet"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span className="hidden md:inline">Print/PDF</span>
-                        </button>
-
-                        {/* Sync Latest Session / Re-generate Button */}
-                        <button
-                          onClick={() => handleGenerateRevisionDeck(activeRevisionSession)}
-                          disabled={loadingRevision}
-                          className="bg-white/10 hover:bg-white/20 border border-white/20 text-teal-200 hover:text-white px-2 sm:px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-mono font-black tracking-wider flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                          title="Re-sync latest classroom/document notes and re-generate deck"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${loadingRevision ? "animate-spin" : ""}`} />
-                          <span className="hidden sm:inline">Sync</span>
-                        </button>
-
-                        <button 
-                          onClick={handleCloseRevisionDeck}
-                          className="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-full transition-all cursor-pointer hover:rotate-90 duration-300 shrink-0"
-                          title="Close Revision Deck"
-                        >
-                          <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Interactive Study Progress Sub-banner with 3-tier active recall breakdown */}
-                {(() xœì=Yo#Ç™ïşeÚë¥“Ô9ÖĞ#4šÏ #Y–dc³SlÉúr¢dF¯yZ$Aäa‘…³‹õ>åe±Èï™?ÿ„ı¾ªê“İ]Õ$5WÜ€Çbwuuß}ÕŞ>™½Gæ.Ãu‚ÔdøìÒL×yÈŒ‹‡4¤÷»#‹ñø7¿!Ï¿ù¬²Ğ©}ğÆ]‹9ãpRİÚ¦AÈ|6<t#'„·¾üša÷’ZÚÉSìk­;2-øÙ~àº£Îš²ó	¼VŞ1î”†¦3N»õÉŞ>ööHßl©?`³¡Ù‹}B¼«ñFƒëÅ>oj|À3°k±oûdÜ'G4œt}øæ°İÎïPO´[#“õõ5Ò'ëŸ½WÒ³ÏÂÈwH»ä!÷†æ%1 ¢‚cj³½Ö`Ü	,²ÎİõõŞİ2pı!ó;ƒøñpw}xWmâ]w6»;$°ûğóYìŠÿÓ1\‹ØÃ>ÿÛw§Ä™tæÀÈ¯£ 4G×§Œ9dL½Î	&¾é\tÖIÈ®ÂÎt¯€Y°ÈÇuXk¿t„Ìz“³hĞ	é€ÓKsÛà:äãŞMÅÅ9óQçˆÚ€yñáO}ê%C–`Âñ ¤~H¦Qdñ)O;4
-İÊÑÂçQºNåsBÂk·‚7kÕ´sCË4.öfí5µ€…Fh^²SI3Îé İJÉEk­jEğJdö6s÷×€Ãv®,2r°c»+¶è*w®5$¡OÀÄ•ïPXˆê55"?pıçšb%'tèN±¯ËˆazÑâÔbe¦Wû:\Bè¦ö Àx{]‚™öõx öPNÊ¢Æ	j±ÎÆúªó>IQ°£·›ë>7q/™ßO}*‰»ˆx–G7h[÷ı›ÕûZ† ˆGıŸ~øİÿŞëñ?•m§¬§=ãÔçfMõî½ äı2Ú$›¼ZŒ°MghSïD‡xnZ¸2jıŒ
-xÅ¨ğßÑE…C×1˜’#Xp`ÒŞÛ‡AdÛÔ¿~'Ñ ›Àšc÷gDÀ+F„ïÿ¤‹gb©ÉGäØYğöáÁ·‘ùİ;‰|bZÀlæSkø3
-à•ˆEÕESfàÆø¸ÓGªç  Tâª;_F ÕÀuP¼†ïºcŸ  p¥Ğw­`iígkN£™ÓÚàI|‹ÌÁ=bB
-4Sóä£*TÖ&ÓØ¬ïw*ÛŸÅw¦c¤¸ğ|cÃ»ú¦µ/—»¯†ŠùÑM;›Û¨4N;[›$‹	á‹=él„ü‘(71‡CXæ
-ÈçdD1;1ERPÿÇ>š°‚Ğíødä»vBvpIÜTlœˆQèÛ0ò¹Î›g§§"„áµDvF¦æ0œôÉ‹gŞüÓrSGŸñê)6DàTm“",d(8ÂAAsŒÁBŒPƒTÔ P5ÁĞ5XÔÂÃ
-†¢„8%ó—.WÂÈ'ÔZìl`RuT9 ¾ÉYxç9I©AÊª2L)nk\‰¥TÖ»; ,U¬¿Èøó¥^ĞmZrUÈcm“ˆj3a;ãNsÄlP«¥Â9ş~©$UZh:–‰f=ù²ªæI»W†§$JÉ~†@˜_éH¸&¾°‡¯ OÙœÉáôÁ}•@x¯v\5
-G-§¨yXùhmŞáp³Ö.ã8(\QÓ!ÈP˜!_›lê¹~X*T–ñ&€§DŠ¹ÂcêW ÂëpaÈ›óälê¥Ì¬äùüàÙè“ÇÏÎœ><«€—âÅ©Úôª@Ú_,+_‰Éæ'Uëú°M§3é<ßŞ]GìD\Ü®vt´…[­®Âu˜íI×(.sDÚòXÓõµš*¼RñUç*%xY‰z6Æëì
-(—?/Ş‹ÕÖ–P
-Èo0 Ù-µ`}æQÿÂbA"íEÚ-Š‹,4Õ=¯Fşä¿µìf<T'f@pïõ¼f*[kÿpÂ| ØGôŸ©²7€ò˜9 ó‡É€ÈµhØÅà‘íúŒÀ +ï+?®”ÀK¨T|ÕÈÆä#ß‡Fçt®Ïå½d±T à‹çëJğçoñÓî»æ»8}àmíÒoÔLDôkGÒ“}¿ÿ~Îµş\|T=6ñeás–s–hİ.<ü.¢÷˜…'üïó	¨z•“ªìN—çbN1k(e=-’~¾çg!£€ôwÃÛ¨_cQ©–hÏ™:
-tÅ;5Q¨›‰–;j€söîˆÎ»;Bz¬ÿøhpÛYW„tŠuœ•î=ùÙ¸!îˆHŸŸR<Ò¢4,ËÛwğšåQE©âÊï¶‡[~¹Ğ¾±üÚÃD¾æÒu²…‘ç1ß SÙnã«€ÏIÌHÁB‹âÿb|ckÆOĞ<Jú‹~\ÆÄä¼æÉÇÅÏùO‹û>Œ}ûnÀÒ®ù¯ùùm…Á7¾n^Ü¨¡/1ß~BÔšœ.ˆ×Jùñ¥Ö]4UÙ¦Êìœ{$tÇc‹!:m[0I|$9ïHJœ
-†Â‚ÎY¥šf¬mÓD««Õj?&ÒÛ¬€ùL ²º½g"wsúıvÚsª¼~Mğ×®±Ï2ë?™şA/¾ÛÂãíÜMõtğpm?8 MàLø¿Æ6±´hƒM~òa¶`æ:Æ€Øm37ùâ”Óùêâ»¶yJÃ]ëÊ?[A0=Á¿Qeõi
-?ŠQÎ»OŸ‰d€õØ°íš‰OßÇ?”¤b^Ü’ğÖ&ç İoÜá7JT>`ÃEDI}†sÈy'Õ·¸FxGØv+l±WkKH¤NŸÁÌK6çÆÃ ¼\<cíJ© wş5.Æ|n$ˆ€Î]7 ~OÌñÄ‚ÿÊ-6ùKrÛFkE şuB×C·VÇÇOá_ÓÎmÀ^ø'çÕX‘Ï×ŞõÚ¯;@Rå²vØ%ú€/Hc£câ-$qèZ®ß—šM7}÷‚iù4–›#ØF‡Ø¥#¿–EÁ&]p;Ğ°K¬Rp…`=2oİ.j(e‚2×œ2Q©Ì`\€(Ö™šÃl „ûÓ€‹Ùƒñ' Ïİ>‡Qª!/=s–µ°—c×¿æFˆÌ}À$ÓÀ›­C´©ÈØ26«/‰Vùº³‚Õ¼*«%0Is/ GÅ0"ràSØÃ9C²ÈÍùëËÿø|±€‡j÷0„a`1{¥3Öa uë²^³.‚œw2âY*fÈ‡¯ J²ÕCÁSP¹C¶¸ë#	XDVN¸uÚTF+¦k¨çÑYé„†>p‡×PĞØHte;kÔÕ1¼_
- Zv€Â(b±Ê4Uõ>ø ‰H!üèGöPü’Œ¾Ä®ƒä¥‹+Gõ>Çì‘SØ 3„?g/G’F>Ü-Ò£ocÌ$IDº>d#ÓápİÒ³µäÜøjNMG®oGÕµèğñvC8ÿ€ÿ¸€YCÛ§Eòi^Dq2Î‚Éí¶’(:;C?$3Gd“kl¡XíMi´-uq)Ù+7¢	w¸-ÁÄ&x÷DŞ\t¯²f(Ü…2ÓÓîü©ÌèÍxoæÍ·…„:¦×Ä<Ø«õÓüO µ r:ã}œ+Š‰_ó‹£Ãçø4Ú¨•õ‡ÉdKÇtE—!“€?1‘ä3eÁ°·HQp,ÒD*ä¤ˆ(Ù°@Š4 6Cì	édDQ¤ëÀàºIesd»`×—§„€]Ï?XßÙ06Ø7ÎKÔJ)^)V5!re»?gSÏ»E*µ{€¢Õ/Ù5‘ËÒ ‰ø`Ôğ‘.ùDtCzÁè”^¾O¯»fÀÿß.m¶†íJŸHO?Ï@]¤ÒÈï9†š9`‘¤rAP·V©a±
-®Zû®¨MÎãEjUå[Õµ©×n‡}ĞYÑŸü	1‡W}âD8nsÓ]ûdº š{3èå¦Â ÒUuâEK>Pª)ÅÙÚùçïõÕÑB·û³PÛÊšyµÙ&¬i1É†¯”ñª}«T­Ç®rå;v~.…i¤	$,"µä	%ö©ğX×Ì•dV·R+3C€gİ t½ßõ¨Hän¯ixó^™,`áYQ¨mhÇKÏ
-“¥RCƒ^,§z’Z6„ghäDÖ `‡ˆı5l³yÅà>i=2Ëá“[ˆz¢øoĞÔŸ¬-â„QJìº+	Ê/¬LS3”íÃ~—Ä²bä–ÈJÒJWIÆ Fx5E%¼
-è$ã¨ÑÀ; ıÍŸÄE?t‰u…í9‰-Ja]Íoî®g6+²nìyÅ1•"– ÆK—ıôÃÿE yoo¬iêznIÙúM‚¸.Ëòp @HlEAETË›	?’#¾N¤½ùNCƒ(¡³<,$¡Thˆï'ğß˜‡ˆLˆÕ›	ÿCÁj‘öÖê!bÅ’¬FeDÂÂÉ¦agË İj ¨È”ÁW#Üóv’T™é…QúåQûª˜ıô*Q+`5ÑÏ…æé†–M#‘Æùÿ;dC«?5YÑğ	Í€,6Ü«£åiMÅ¤{A•(»Ylå
-ii–*¨K6ÖªYP“‰G%›9nˆ÷İ)Ou½úÿá„]ú®óMø9DÆx”mı±ıLšq#eù®¦ñJ°ñYEèÛI ¯¨Œ&·RwW’à¥m<âcQ°J‹Rˆ|®¾(HqWYB'×°ÜßŞHÏMâË¢"ì%±\Õ=e—ŒZq¤Dû Úúî›ƒËq {2ã©ö»Æ‰~ñ¦q¢d©æH·À‘8êÃt´­V’‡òÀÍ…˜˜n^²TıKv=pQ¨&®Q	³<İØâ–¬ÊıäÂµ:PJ¬öËûñïû=9‹‡«iú/Çûç/ûÒ#/ûÇoRÿ½Ô'tkä;ääº|„³ÊtúX;«Ğá“L'H¬êd£·ÙÛÊttª9=¥Ú¦ªsREEFz£Ëİ¤q>øfŸ~q|øèäœ==~HNf…ÇÅõSÂã˜vX|ç*M	W‡ñÔ{YLœ»®5¨Õ\JÎzZ1Z}©z½MşšAÉ™‚»
-êêçR¶°¬×ä„5¨ƒÄ¤/-ÍKë¸İ°Û|8í–ˆBVY¸Š‰Õ© õÙVÊü);38r€Ùâ¡@¹{1[O"A²a#;27'',Ô'=Õ¯b}vS=íIÎäI4¨¥_j&újƒ¯Ìb|o/Xœá'ÈCê_,*¹Š×)gÔ7&ä#ò˜—ˆ¯•¤tife¡>æÔÅ?ä.É.¼Çí]U	=9§ru¹°©Iò†r åIDjõ=Óñ¢P›çğ“*	—íß›ÅÀÌ§ Òƒ O'Ô3©ÁSşz›uCê™<@ijñ,	&À£˜¿×ŠQÄİnW5ƒy©#‡LUzS†xVgtÓ„VÄ»G\	=-3ÌŒ´îQĞw£‡Oóì-q+‹äÛ¼!0â Nıtj7_­°Ü*=ş¨‡îÔ±\:”[Tùr¬O“[Ù²±1•ÌéÍq|y™Š\^ŞáN¼¼yÍ¹quÙúÅ•½âé“³¯?OÄÔº7Øœô· •MÖşúsÂ‹²×A³É¢Õ9’÷t¡H6=pôÄO:§, 'ÇŸ¿v8‚14£êêÂm:Úß±;„…ùÜ7‡¤GÎ}Æjäİ¢`ï³¬(˜ä÷»¢‰¢0oyÃ8Høí¨õ¥6!yXYKò_¹Zô’šZ?|Qg+`®^÷õ–»±á±ÜÔœÓ}Ón×9şï‹ùÅçµ>¡Î5#Å*µ.GdÑZë†î3wÊüC°öZÖÚŠ†xXT~<ÙFkğªú#†ë3™w&!r­¸6k·8Vš×Xdõ1uOûbáV[
-kŒxÿ &rwús“XãÌÏ-½ºX9 Aæ8r¾ÏóAæ*•¯¾\ô¦tlˆ‚hğ9ŠèãLşâ#«+/&.-"‚—VÍk’Êk´­< «š2åªQ$JñN‘dí¤5Qü.usBCÑ[ZgbEA½·Q£`S?âu…•
-xÈÁ5Ûô'N¯ZG¦Å¶Âzñ¥ŸZ4ÙVL2RC?r°AƒÜbhJø_ÄÁ'¦eQ4ñqZ•‡ø€{“í•g7‰ .­®·+ªë•y«¨®wG?	)1IJsêÚ¥´sÅV.’2X0¸½alŒªqAs©¸›±‰¡:kp±<érã]Yóº¤*_æRû‹*2K½ú¤y½4Áª$İÍ¥òëf13Ò’íOHğd&ikiÊ¾zSÊheNw…Ak.İ›ŸG§6IÔ£¥yƒ|Ùf¸]Ğ˜Õ8“­~ùl6Êx¬„E>6ìµAÂjÃôº&)s«Ì™Ój¦PojôÆ¸´·úäÑ¿<:üêüé×ÈÙWGG§¿jèÓOF[Ğ§½]âÓ®–÷trP¥æ‰ø³eÁò$z/î)p’´«Wö\ÔÈv"oM5k§›^¶vEís¼%_^¥©Şq!}ŠÄ¥É¦"?´i$ÏF™;©†“*4Zé8¿
-y’u‘dÕ‰İjS^í½ipñá„z8ôxUWj¶^‰´Ÿe$”Ì¨`'1T»14Tç	Î™4” Aºö—Ÿÿ-Î“E…lÏgêî%#†\˜¤;¬§N˜È`Ô"#€(˜—R+ ÁµÏó;6äçSaUzYGÔwá'-¡kI¨U„c…é((G¦G…b³EË.¼6Ülˆy_àê‘S„N‡¦o*ÒÇĞG± ß	Ò±;æ —)øĞ¨î\Ó5T™yĞ•ÖrÌV]^¢º°„n‰BA¦Òz›Eÿscù·¾>E
-m­ıM¼™¤^~ÚÍòå¼šˆåM,"Úš¤†@®Ç‡ÔTZ+Ïè“Ö	@l!u)	i,¶½£t4sLñíQÒsÁ²,-Ù¾·‡z&`Ä‰ç¨Âg²ÊÉëmÑ¡¶ùl+5l4¨İS¿QU\K3F]Zsso¼›Y;o3Ë@ÙòQFU+§¥£¤0$~t;„ÁT:Ï¢H3nP&«:?B˜+~ëü‡š-¼f¶ü[Ë&DE.Ôª?"'f8¢–FM£jæï(àUKn—CXÌÏ}“:ãå¥mô+“Á¨²{	Ú!Œ=ÙÒ[æ‰A\SºFğ‚µéİªhŸŒƒ±Ô%ÕiîæÊµ²u^²kŞ,)Yç¡MHÖ/ÿı/ÿÛïß©Úôş±äê…ßu&ìí>9=8yúœ>:<xöŒ|ùÕÓmhÂş62¿[Ô~½Õ,'ë¸É³¢3çl¾[u›i0A™Ê"ë¤ğµEÖ-awW…c-˜«·=Ÿ«·ğ±„:İFYt%;e™9rÆ¬Q‡Ûáš¤£3Àn¾µ™cP˜J€‘Àr˜—\è²õ•µ¤SmÕnªÕÄ™ÀS.ÆÔÍŸ1š?YT'ª®Ùy¢ÊÎ´#ì´cìšEÙå“ØÊ¤2v®9§y:\î|8Ì_›+ïÅ#rÇ/ö6dêZaõâÄôB¤V?W¾·¤ĞWQß¬p›¾ì–œóA³è¨&ñQ¼u£:v‹U²[í‘ŠâÒHì¬Û—Õ$}f¯e¼D
-ç˜îdNVœ?Ê4ÛLíñj–SºĞùŠâÒulg™§F/ÿü=ù
-uš tİüIŒ™ÛúØÒ¨êcƒÓª|Ïåç—ë·¢
-æÀšü15·sÒÂ½!?ë!ÈÛšİÈk@Ee K-!Í{ª2`™œ(SL»JOÌ,4§Ë7™×SùÓÿYšêQÖÔ™«ĞˆşöäB,jÀ2‹å!‹D7VğÓ9k‰63 ÉÑUÁgrvHöÄ}àÄzYìP²eËCQâ¤@«ÈNá3²pL0W’©\™…NÍàßjXåÿŠüCSA„c«š)åûú¨Dï¼f«Oiã’›xÜY¹ƒåÍ’ádî'Â<n@¿aWë‡ 7hd… HEC€¼Ã ”ŸDƒÏŞû   ÿÿ SJAv
+                    <p className="flxœì=ÛnG–ïó&ë¡2!ER’­0–Y¶cc,G•`fn6‹d›İî¦(…#`Ÿæi±³˜ ó°˜…³,&û4»XÌ÷ø&Ÿ°çTUß«»ª)Êv<nÀ2Ùì®Ë©sN{Ñsb…t´Lê„Ô'Ãkõû?#Òëvà1m#3º×éyØ2fCê·¶;b8ÖÌiË›Ûmì¿zù?·7ñ•}rèÎ<Ë¶œ	ÃÛSÓğGÄ§¦aÛdDÍÒşnoz²ÜŞYgÒ¼ÂĞÎÂş©a·ºÎæÍ±©1‚´|jçtDÆ®¶Ã	ÈÌ8o-ğÙyË˜‡n	§Ô÷/È‘ñscF¬€x>õçfÎƒĞ…{JÃ­3šL7 èŒˆé:&õÂ¹a“™ßg†CtÉ”Ú¹pçp#Àu§Ğp@ƒÀrŸãem)4$@’‚HrsƒôaÎ,ìå,Ã=#4ÈÒÌ¿	/¦A;œ´~8Şcóºş–¿Cf£>ÿİ
+lÄ…@}—ıê»sgDG­­s›,Zã9¬=‡ø-¸17Fıiëé§ÛgÓg :zÎş´L×&îõÇ¶»hM­Ñˆ:$˜#øÖƒwq%°C–Ñ
+a6-À,Éòn,7?&!`Ôî˜œXCNo^ßh67ÈŞ>YJV7IàÎ}“Ş5FJöÈ„†ƒäÆ#gì69jDø*o|&iĞ§áÜw
+Rº,pÆŞ
+İ–OÆ¾;ƒ•êŒz£ñŒœY|ëv·Œ­[Ï ¥ğ'³G{É"£tlZ»°x½§¡Å8ñÎ[ÛÄ»hõH0ëÃ—›ìÿ‹ÖV{‡/X†üÂ_´†4\P¶h@'/Zr“›ëÙ¦c€ªg˜´uÑê"á Òt8jtK›*6Vcw¼¡…oxmI˜À;a}l ã?İ_Ÿî¶w¼ógœÃmÃ|j¾@î³°FpeîyÔ7€"L; C iD”2%hT_şù{28:89%'÷¿~4xôÅ“ªÉp¾\ñDÅOH4‡0'˜#á¸M8¶Ëè%ÀÊI$Ğ]>ç ü4Â™ë¸˜®=b BˆqÀ¥`&Ø|¹»ğlTòÑ2E®íáäGpù¼j„„VhÃÓoÂjš¾å!ï©z·z„ö3íZÀS.Õ«%}×6†ÔÖx9z¢ò+W'Ùw·<ü¹cqˆ{Ïú–ò U`õRÊ+ÛÁ|øj†ä·¿%âã%yõOÿIØê‘%²AZ‰Š
+˜”Êâçé–LÔ€Iq60Ã}Œ}"igè_À!–5à%şŞ÷íüvÊÙeˆ<ß5á#"²–ãöæt«”WA“ƒWPá¬Ïùo´+™]!|r¾sÏ]8¶kŒÈ œ.È1õ‰Ò ’ùÜÎÃĞu* è:‡¶e¾Ø[NAL³éısÏõCÖvQ…KÙí’›İ™¢ÀÒïÀ.š•âÛ))…¿—İq£ÍV°»nŠİE˜ò´ÛAJŒP+O”Åı§”EFKƒee*qıÀõ[Ë„Üˆ“BwûÈô¸6* ÆÙg#^Ê#Ã­8Å5]Xá†ïÏæ d.@£(]Şx%›‹;L-Ù‚I.SüÛ ›µöÁÊ€h#VÆ±†]Íb8NV°]Ä÷c l’ò-ÀàøŞƒua:—c9¾G 9¥äÈğšo4nl\;Ú3şÖû»Âz¾ ®ÏW—3Ö:SJÃq›5C».ÔfíoÂp×„×ƒÇ$a'!XlY€å'´5¡è€wY3×ìŸ‹.NRªo‰RVE#+0†6í-‘r ½¢—ß“MM²‰AÙwAË³Â”yÔ¤Ø Ùh}×m\s>ƒ!‡í"¸oø)ÌB‹ÓŠdvBÇ>¦‡‹Œª’¢4P(rØ@îFd<Ëi>i4@ÅX&S’3ÒĞÈQPQ•f–“m7ÈPÏZ0>Æ´e–¡jÔâ­ùnÈğÍa¥ñY©b«ƒ¥ØÌ|ouLùU–ozlãâ-ZLò¶ª™r²ne¿—Šæ¥?ILL—MàqR³Ø£”Sf¾;ìÈ`>ÍÆrâÚV+´à³xXØu‡>5¸X·šM÷
+Ê;í”MÀ§Ïd–3ŞFaCìá¶MI8-šÛ^éèğ.„·¾`šeûÌ°ç4hÆ¿b[í±eÃ×æ]×µ©ál(ŸÂkò†qp'€­Î$iÖGØÀŸ½=ÒÀ7êftdÍg«uÁßÕè„ÁÅj]à›x&6Í×mŸt€yá´ÍXA³™]¡MşÜù˜t;4fw>“±¹ºVTaÆët6akÊ›Fù»ÀVbS(×e™14k³ù‰}öİEµ]÷Ï­DNqÂ€Ú ä–ãV˜J˜<$CòÄ8³&ŒõUHNú:zl‡,€	Gw‚Ğ ¥gğUÎÖ½Rl/<\
+öX×Î‰w2bÜ©1l6v¡«Ñ,ŸÃbnI¤§DLÊNÜà•İ ÊaZ*}$c†Éeä§Æ	+5½Ê×	
+"U6k1Ù(-r­Û©Tmğê“„tv¹Ï'Õ~bÙˆºÅ*ˆ°2'<[Õ•½V)cíÿøò_şWÃHÊxl=Í%ã>—ëÁ^E ëqfxï$9DsÓ¢¦H½'’ÂŸ¿×%…CîÊ&h2‚MÚûé‘A0ŸÍÿâ$ƒhnZd +hMÜ÷„€WDßıQ—ÔäÆÚ¿¯™¾™[ß¾“DÀ&¦EQÀÃ{ )±è/º$pÂUşcf/0©>	”ıÎ,êÎ—sÀjØuPL&n°¸ßµ«ÜzÚÏVA£)hmğKt‹:#R°¥V¹2ÕÂ<¹q£De­3**kEêØÿÖrÌ„v»Şù³Æ¾ w_+!7ºE«'Ì_[=’¦ˆ¬•oÚê"½J0Ÿ±Åìø8äM”’ ªˆ=ì HÜDlœJm“±ñq'7=³ $/0²dIÖ(œöÉó–^şÃsrY’Bª­ÉÊöHrÑ9Í1B>B0“ÊÈìñ«º‹:‘«E‰qÊÍ›_º[8¿røÁt> $ê¨
+;2HÎ¼D¸…g)±¸‘„Hc"ä¶'¥T9œD¤P‰)·ñç9Õ°äÖ{ò@Û$¢ZLXÎ¨Ñ¬g½=
+¯ªx_ÃÃ{Ğa«ê½3~îu á	‰Rlï1¹$ Â‘pA|n_ÊüëFC6öu"áíÊqU(•;Åõ{¾Ë!¸;° W'$_[tÁ"{dB¥lo|Š¥˜.<&~Ğ)<îô
+ƒŒM]º™Iná˜Oî’nŸ<x|0xxxproP" _iÌO•+¦ãùyâDnR•®Œæ¶nï²¤ÅírGG…Ó_ëp¦[Òu òË“¦x`ÚÙ¨¨Â+]UŞ))ÃKKÔ˜áµv9àÏŠ÷Iä©ÀÒ(Ê~K-X<ÃaÓ Ë‘v#íæÅÅ(ŸFÍ¨²9<9ù“qüÆş7µÁ U–,ƒk\’1TŞPÙû™œ…¨G‹¤3x–£cº3Ï¦Äëú” À•”+%pi
+¿*dcòsß‡Fçt„®OÅ½X +€Æ ñùï%ú³·XƒIómk„MBLyjJû¨˜o×
+„'ÚşàƒŒkı)ïT=6Ş3÷9‹9´nökó$cöùt
+ª^é¤J›Ó å¢BÌ8f§¬æ…üb©¸æƒĞçÙ$Ì5oß5äùKºcªdÚÅ°±,_AñNÍAêf¬eGØ91/ÛV.ş±Ğà¦ˆçº 9—Òµ'¿ İKÌ>?¥x¤#DiX.®nßÁk™%¥Š+úÏ-³üö$é6éÂd	“Ì&…í6ºrôÇŒä,´qvUtc«°F¿ y”ôWí\ÄÄd¼æqçI¼~¶k~¿FÇØ¶ï©¬1ö­Ø2»­0øF×åóK5VàÅçÛÏaˆZ“ÓEñJ)?ºÔº‹¦*[W™-¸GBw2±)ò¡Ó6ùF¢1‰œ$ãI˜Suc™jš²¶¥L“¬R[­Öó…0IJÙ·9“Õm=íù4£ßo'-'Ê{^á×D\áI|)øÀÄ1> İeáºx;sSİŞ†]ÛÏ N6’8;¶1ˆ¥ylüU3ª8î™gæ'ŸŸr2_]z×6Oi˜£+½@üBùgëè–Ç÷oTÙA}/IŞÎ4û«b”E÷é£ –°Sš¨™øëøAÉ*Šâ–Ğ€·zQP~tã&»!Qù`ÎJâ3,çÍD#Üb!ÏÙ5Mn{ˆ„¼J‹X>Âº˜ŒŸwãL`^&±R*Â•¿k˜/&ln˜
+äLĞuê÷ÔšLmø'·Ød/<È,›1\{ê_+t=tkµ|ì
+?-Z71Ğşd¼ZC{î3ØGéÀRX[ôX}À RÛè{‹†1 ]ÛõûB³i¡ï¾ Z¾#p3Õ4áZ)¿Ê¢`cÌ–Ü5ìëœµrÖ£+gİÎk(2A9Ÿp“ÈÌ¹Ô›8BgûÓÀ‹!æ‡ß|zpáö)¦õ+1/=s™¶`îóÄõ/˜"uŸ8Á›C´©ˆØ2mV_-MbO	VEUVK`’Va_ÀÃˆÈ,`7É Ù7Û__ıûwäË9Bùvì»C›ÎÖ:c´
+.
+¸pvŞJ‰g‰x˜bc¿‚2ÉVOXVÏê®8`·rÂ¬Ó–2Z1¡?DÒ1½ë.Và ‘‘øÊvÚ¨«cø@Š Zv€Ü("±Ê4Uö~R!Ê?ı(ª—’åŒ¾ù¢Mš]Cç˜=rBû˜Ëı9{–4öán}Q&gI<Òõ[Ãë†¦˜­%çFW}n*2ãu-:l<¹ÕàÎ?Ø\ ´¡íVŞ Á~¹••'QœŒå*~ˆJ	ÿ›˜…ycÚ¨·„Ú‹RkYªâRÒWfDSLò†e	¦î"¦»‡âæªk•6Cá*ÈLO»ÅV™bĞ½hmŠæ[Vg)JUƒ˜kUc¡~|ù‡ÿ V"§3ÙÇ¹b ÿVÎ>Ç`Pk¡ÖÖ&“]‰9&½
+›ú‰˜$ã˜ÉÜí*Ù­“)¢à˜ç‰—c#Ş£ dÛ°…B¤É·ó©¸®]›UÖ'¶ôâÁÕ9!«j×Ùéš]ú¬Ä™Àh)ŸL'ã×‰ÿTFnSÏºEJµ…ÙE«_Ò"ÀRƒˆØ`Ôø‘€ü-bº¡ñ‚ã"@48ğ}ã¢mìÿ¦ô±|Nú‹ğô³Ô«¡Tù]ØP#g­’Rw™"–QÔõ UbX,Ã+¬ocÌÈi¤šX%_ªöÌğšÍ°:+ú“?!Öè¼Oœ9†ÙÜtaOPso	­\–Ø xºªN¼¨¤©¦QdcÿÕŸ¾ÓWGsÍî/Cm+kêÕz‹°¡µIÖlx­¯Ú·ZKÕzàº!S¾#ç'aR˜Fš@Üa¨Å ±O…@Çºf®¤èdbe¦ˆğ´„®wì»Á¹›Ş¼×æ#h8Èµ5MàxéYa¦$54èÅrª'©eCxŒFŞáÜ®Vc)nGÔi,(wHã!°Y†ŸÌBô„¢'Š}MıáÆ*Nµa@bĞXKP~2uÍP3Ö[ËŠ‘[<+I+]%ƒ6áU—”ğ’V¤Âá"»şæO¢¢ºÌºÄöÇp¥0®f7w;é€ƒ^iÀAÚ]V.
+¥ˆ+Pã¥»ıøòå‘‡ÈŞ›İMİBÏ-)~[° ªËru<†ƒ"Ä6ƒ¼… $ªåíÄ…ÈƒiöŞilà%t®q(URU¿³!VEŒH…X½8ñßä>@‹4·Ök–d5Q†@Ä[8¹ë†xAªĞµ‚òLY|5Â=¯7!I•\¥/òÜWÅì'—<dlØ­ˆ~ÎµP¤k6p(›F,³ÿ[¤«Õš­hø„“’˜r ³´ˆº‰bÂ½ J+ÔÜÊÒÒ,UP•l¬U³ &J<æ¸!Şwt¤ïÕ×ø§ôÌwÇhÂ/ÔOÛ?Æ¤w®,c!ŞÑÕ4^õ¯#>+};1öå•ÑøVâîŠ¼4°E|¬ŠVIQŠˆñÒÉ5”ûÛké¹q|¡,*Ù^ûÀTİzF;Š”hĞ ª­ï¾]8xµè¶È8C®ı®íD¿xÛv¢Ôïw¤kØ‘é>éh[­ÄvÂ7WÚÄtó’õ¤ê_Ò‹¡‹Bu0uıĞœ‡;§K7¶¸†%k§t=™p­”âĞ~õÏ?üí¯¿'ƒh¸š¦/şrä¹úêwÿJ6É«ßıáYâ¿ú„n‚lƒŒC“÷qV©FhÇaå|˜j™ÕJt7{›[©†N4§§TÛTuNÊx ÏH¯Õ¢ÜMåƒ÷úäğ‹'‡÷OÉÑ£'÷ÈÑÁqÍ¬ğ¨˜¢~Jxæ`·›çIJ¸:lŒ¥Ş‹b‚äÔuía¥æºRjtÚÓŠÑêWª×[Çá_û,²:uõs)XÖë2À aî #1éKKEi]7Â†Ólğ(d•…+Ÿ‘X
+Zm¥ÌŸš¥ÇÉA0]<8÷f´­Ç‘ é°‘‘›“ª“ª¡XİTÍ»x’3y8Vò/õ&úzƒAæ-Æ>¾Ÿ.Z°rÏğå±òK*¹ŠÕ)§†oNÉò€•ˆ¯>ŞE“g–ê£NuP\¾ƒ8wIÔpa-nïªJè‰9ÉÕåÜ¢ÆÉCÈ”%i¨Õ·-Ç›‡
+Üä4‡]ª$xV¶o!3›‚J:Î„ŠH…²×›´ş„Š3”¦Ï‘`
+{õ÷yaĞn·U3(Jb*Ó›RüÀ³[» ›¦ÊÉD\‰ÃH’a¦¤u×œ}w²ği–½Åo¥‰|›=(®NõY0J…åZùqÉaÁÙDŸ'7Òec#.™Ñ›£ør™Š,/ïp3oVs®]]¶ùÓê_‹©Uo*¨ùj‡ÑEÚF§ğ¢†ìM`ç\ƒDÑê‰{ºX$3xôĞšL['4 ÇO>ãxc¨ƒGåO¨·éhOÜ æsß‘MrêÓª£…u‹‚9¬MYQ0±ŞióG…ÁĞxËŒ‚„µ¾Ô&$+k‰ıW@Ë83,­…xgæPúö›-wÅ¢£'bQ3bL;ô­Y³Êñ‡Ï/:§¨éô‰á\04R@©é´!³4ˆÆF;t»êmn´Öö|„‡EeÇ“~h^Uwbº>yg#7Ú;£Í¦ÅJ³áš«Œ :&¢ê×>ÜzKaMÎña.w'_{Ä¤¾néÕÅÊ 2Ç‘³u.™«T¾êraĞšÒ±Á[æÃG¸£ğ6âYUy1~i1¼´j^“$P^ãÙÒ²Ê9S¦E¬ïäYÖNRs°x€d´µÚ¢µ¤ÎÄš‚z¯£FAO?âu•
+X{¸ƒk>›ÓŸX:u¶j…Î±‰Ùkmõ(¢K?µhº­*g¤Fg°×ÈıX"…&Œÿy”|lÙ¶&# #V#N«òğæt{íÄu"¨¥Õõvyu=I‘·’êz7õ³‘“PšS×.í ;È—r•”AyÂàv×ìË ™TÜ^db(Ï\-OZîqüTÔ¼–TåË"A!e°_+±¨$c0êõ'Íë¥	–%éö®”_·Œ6s.] Ûş„@¨“¶–¤¬á«—ÒVät—´
+éŞì<Ê(…°N² ÷æ2°-mĞ¨];“MŠ¿lEzµ2Kq‘[­‘°Z3½®NÊÜ:sæ´SH¨—•zk\Ú[}rÿW÷¿:}ôõ}2øêèèàä×5}ÚÑÉh+ú´·%>íryO×8!%5OD¿à±¼T,s ÷¢F‘ÇI»zeÏEAt#âÖ`Ji¨Y;İòÒĞscvŠ·ÄËëÔ ÕÁ/D£/@‘8³è‚ç‡ÖäYÁ(s3Ñp…Fëà"çW.O²*’¬<±[ÍbäÕŞëN‡­A­êJõàKûéd…’%ÛI„Õn„M€ÕY†3†24Hwv×eçóó$xQ¡™çÓ)u÷ŒS &nëi„Sê1X¦a“1`ÌË	; Á…¿Ö·tÄÎ§Âªô¢¨ïÂW[ÌC×<’P«ÇÓQPL8ŠÄ–«–]xc´Y“:³¾Àõ'4_Z¾™?¨HŸBcÅ|ÇtdLÜ	C½TÁ‡ZuçêÂPedAWZàX®»¼Dya	İ¹‚LÒz½¼ÿ¹¶ü[]Ÿ"Á¶Æş‡±&^OR—Ÿvsõr^uÄò:mMRC ×Û‡Ô©´V–Ñ'¬@ØFH¸Ô¥d¤‘ØöòÑÔ1Å×ÇIOYËU™¨dù~:Ü3F#Æ<Ç%>“5pNVoËè´Íg[‰a£Fí’hünYq-nÌ·xš™{£ÕLÛyëYd#ÈF­T5LÎKÇqaHüøz+¢	¨tm8<Í¸F™¬òün®Ìù­³Õ¼f¶üOv›à¹P«¾A­plØ5–¨™¿£{«Zr½;ÄMığÔ·grui›EıÚ¢0ªôZ‚vc—ôš÷Ø ®)]#úpÁÚò®U´NÆÁXjIušO³åJÙ:+YG5o®(Yg±KÖ¯şíû¿ıõ÷o‰Tmy_rõÊï¿>övŸœ?ºGNî<~L¾üêÑ?Ö4a3·¾]Õ~½U/'ë5¸É²¢Sçl¾[u‹iRÎ™d‘uÂøÆ"ë®`wW…c­˜«·]ÌÕ[ùXBÇn­,º¿F¢ÌP{Übv¸:é¨§¨‡™ogt†c&l*îˆÀa1¡7H×WÖ’tLµe«©V—œN™`®SW<c4{²¨NT]½óD•iGØiÇØÕ‹²Ë&±Éˆ¤4v.9§y:\æ|8Ì_+”÷b‘™ã7»"u-G°zqbz!RëŠŸ“†ï]Qè+©o–;M_v‹Où°^tTø(öt­:v«U²[ï‘ŠüÒHì¬Z—õ$}¦¯„dj¼Drç˜î¤NV,eš~LöxÕË)]é|E~éÇ:Öˆ³Ìr£Wú|…:Mºnö$ÆÔm}j©Uõ±Æie¾gùùåºÃ-©ÂŸ:°&{LÍõœ´p{ÄÎz²¶fwîÕà¢"€¥’‘f=U)´ŒO”É§]%'	¦ Í8ÃU›ŠÆÌê©üñÿˆ(Mu?mêLÎU¨Å7 Vµ
+`™EyÈ"Ñ¼U°–Ì°Ñz 1º2üŒÏIŸ¢œxA+«ê![‹r'Ü ZEvrİˆÂ1IÀlTI¦2+šÁúªYåÿŠüÃ£œÔÇV=¦”ï«£5úyÃVéÃ’›xÜ3·3Ëç‹‡“º„y\‚~CÏ=×Aos;Ej>Ì;0M ùğá|øÙÏş  ÿÿ kÊf

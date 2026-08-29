@@ -290,28 +290,22 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
   ];
 
   const counselorContent = (
-    <div className={`flex flex-col bg-[#efeae2] text-slate-800 font-sans transition-all duration-300 ${
-      isFullScreen 
-        ? "fixed inset-0 z-[999999] w-full h-[100dvh] rounded-none shadow-none border-none overflow-hidden" 
-        : "h-full rounded-3xl overflow-hidden shadow-2xl border border-emerald-900/20 relative"
-    }`}>
+    <div 
+      ref={chatContainerRef}
+      className="fixed inset-0 z-[999999] w-screen w-full h-[100dvh] h-screen max-w-none max-h-none rounded-none shadow-none border-0 overflow-hidden flex flex-col bg-[#efeae2] text-slate-800 font-sans"
+    >
       
       {/* Top Header - WhatsApp Emerald Theme (#008069) */}
-      <div className={`bg-[#008069] text-white px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 shrink-0 shadow-md z-30 relative ${
-        isFullScreen ? "pt-[max(10px,env(safe-area-inset-top))]" : ""
-      }`}>
+      <div className="bg-[#008069] text-white px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 shrink-0 shadow-md z-30 relative pt-[max(10px,env(safe-area-inset-top))]">
         
-        {/* Left Contact Info & Optional Back/Close Button */}
+        {/* Left Contact Info & Back Button */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {onClose && (
             <button
               type="button"
-              onClick={() => {
-                if (isFullScreen) setIsFullScreen(false);
-                onClose();
-              }}
+              onClick={onClose}
               className="p-1.5 -ml-1 hover:bg-white/20 active:bg-white/30 rounded-full text-white transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-2xs"
-              title="Back to Profile / Exit Kiara"
+              title="Back to Study Desk / Profile"
             >
               <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
             </button>
@@ -372,24 +366,11 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
             </button>
           </div>
 
-          {/* Fullscreen Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsFullScreen((prev) => !prev)}
-            className="p-2 hover:bg-white/10 rounded-full text-emerald-100 transition-colors cursor-pointer flex items-center"
-            title={isFullScreen ? "Exit Full Screen" : "Full Screen Mode"}
-          >
-            {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-
           {/* Close / Exit Button */}
           {onClose && (
             <button
               type="button"
-              onClick={() => {
-                if (isFullScreen) setIsFullScreen(false);
-                onClose();
-              }}
+              onClick={onClose}
               className="p-1.5 hover:bg-red-500/80 active:bg-red-600 rounded-full text-white bg-white/15 transition-all cursor-pointer flex items-center justify-center border border-white/25 shadow-xs"
               title="Close / Exit Kiara"
             >
@@ -849,7 +830,7 @@ export const KiaraCounselor: React.FC<KiaraCounselorProps> = ({
     </div>
   );
 
-  if (isFullScreen) {
+  if (typeof document !== "undefined") {
     return createPortal(counselorContent, document.body);
   }
 
