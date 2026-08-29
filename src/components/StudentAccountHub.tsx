@@ -1,4 +1,5 @@
 import { StudentReportCardModal } from "./StudentReportCardModal";
+import { InAppBookReaderModal } from "./InAppBookReaderModal";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   User, Award, Calendar, Clock, BookOpen, Download, Trash2, 
@@ -8,7 +9,7 @@ import {
   Play, Pause, Heart, Volume2, VolumeX, MessageSquare, Copy, Check,
   Zap, Film, Smartphone, Send, Flame, ThumbsUp, Video as VideoIcon,
   Camera, Image as ImageIcon, Eye, ZoomIn, Layers, Shuffle, Lightbulb,
-  Printer, CheckCircle2, SlidersHorizontal, ArrowUpDown, Grid, List, Star,
+  Printer, CheckCircle2, SlidersHorizontal, ArrowUpDown, Grid, List, ListOrdered, Star,
   ListTodo, CheckSquare, Square, Target, TrendingUp, Radio, Gauge, Activity, CheckCircle, Crosshair, Hourglass, BarChart2, PieChart, Filter, ArrowLeft, ArrowRight, AlertTriangle
 , RotateCw } from "lucide-react";
 import katex from "katex";
@@ -621,11 +622,29 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
   const [selectedDrillSubtopic, setSelectedDrillSubtopic] = useState<any | null>(null);
   
   // Overhauled Archived PDF system core states
+  const [bookHubActiveTab, setBookHubActiveTab] = useState<"books" | "slates">("books");
   const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
   const [selectedBookSubjectFilter, setSelectedBookSubjectFilter] = useState<string>("all");
   const [booksViewMode, setBooksViewMode] = useState<"grid" | "carousel">("grid");
   const [bookSortOrder, setBookSortOrder] = useState<"newest" | "oldest" | "title" | "topics">("newest");
   const booksScrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const bookSearchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut listener for quick library search (Press "/" or "Ctrl+K")
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeDesktopTab === "books" && (e.key === "/" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k"))) {
+        const activeTag = document.activeElement?.tagName.toLowerCase();
+        if (activeTag !== "input" && activeTag !== "textarea") {
+          e.preventDefault();
+          bookSearchInputRef.current?.focus();
+          bookSearchInputRef.current?.select();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeDesktopTab]);
   const statsScrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Smooth scroll to top when switching analytics sub-tabs (Macro / Micro / Retention / Agility)
@@ -5174,6 +5193,15 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             </span>
             <button
               type="button"
+              onClick={() => setIsReportCardModalOpen(true)}
+              className="px-2.5 py-1 text-xs font-mono font-bold bg-[#c4f500] hover:bg-[#b0dc00] text-[#041a14] rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 shrink-0"
+              title="View Official Academic Report Card"
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Report Card</span>
+            </button>
+            <button
+              type="button"
               onClick={onClose}
               className="px-2.5 py-1 text-xs font-mono font-bold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-teal-500/30"
               title="Close Hub"
@@ -8566,74 +8594,90 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
               </div>
             ) : (
               <div className="space-y-6 animate-fade-in text-left">
-                {/* Executive Library Summary Hero Banner */}
-                <div className="bg-gradient-to-br from-[#062026] via-[#0a3641] to-[#041a1e] p-4 sm:p-6 rounded-3xl text-white shadow-md border border-teal-500/20 relative overflow-hidden flex flex-col gap-5">
-                  <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-400/10 rounded-full opacity-30 pointer-events-none" />
-                  <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-teal-500/10 rounded-full opacity-30 pointer-events-none" />
+                {/* PHASE 1: UNIFIED HEADER, SEGMENTED SWITCHER & CONSOLIDATED TOOLBAR */}
+                <div className="bg-gradient-to-br from-[#062026] via-[#0a3641] to-[#041a1e] p-5 sm:p-6 rounded-3xl text-white shadow-xl border border-teal-500/20 relative overflow-hidden flex flex-col gap-5">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute bottom-0 left-1/4 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
                   
                   {/* Top Bar inside Hero */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-emerald-400/30 to-teal-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center text-xl font-bold shrink-0 shadow-inner">
-                        üìö
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400/25 to-teal-500/15 border border-emerald-400/30 text-emerald-300 flex items-center justify-center text-2xl font-bold shrink-0 shadow-inner">
+                        üìñ
                       </div>
                       <div className="text-left min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm sm:text-base md:text-lg font-black tracking-tight text-white truncate">
-                            Executive Library & Board-Book Hub
+                          <h3 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-white truncate">
+                            Classroom Books & Smart Handbooks
                           </h3>
-                          <span className="text-[9px] font-mono font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md hidden xs:inline-block shadow-2xs">
-                            PHASE 1 ACTIVE
+                          <span className="text-[9.5px] font-mono font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-0.5 rounded-full shadow-xs">
+                            Live Sync
                           </span>
                         </div>
-                        <p className="text-[11px] sm:text-xs text-teal-100/80 font-medium truncate mt-0.5">
-                          Centralized academic repository: live blackboard slates, comprehensive books & AI revision flashcard decks.
+                        <p className="text-[11.5px] sm:text-xs text-teal-100/80 font-medium truncate mt-0.5">
+                          Multi-page chalkboard lecture books, step-by-step derivations & AI flashcard decks.
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 relative z-10 shrink-0 self-start sm:self-auto">
-                      <span className="inline-flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider bg-black/30 text-teal-200 px-3.5 py-1.5 rounded-xl border border-teal-400/25 shadow-inner">
+                      <span className="inline-flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider bg-black/40 text-teal-200 px-3.5 py-1.5 rounded-xl border border-teal-400/25 backdrop-blur-md shadow-inner">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Curriculum: {grade || "Class 10"} ‚Ä¢ {board || "CBSE"}</span>
+                        <span>{grade || "Class 10"} ‚Ä¢ {board || "CBSE"} ‚Ä¢ {mediumOfLearning || "Hinglish"}</span>
                       </span>
                     </div>
                   </div>
 
-                  {/* 4 Hero Metric Cards */}
+                  {/* 4 Interactive Metric Capsules (Act as quick tab switchers) */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5 relative z-10">
-                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setBookHubActiveTab("books")}
+                      className={`text-left transition-all border rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between group cursor-pointer ${
+                        bookHubActiveTab === "books"
+                          ? "bg-white/20 border-white/40 ring-2 ring-emerald-400/40 shadow-md"
+                          : "bg-white/5 hover:bg-white/10 border-white/10"
+                      }`}
+                    >
                       <div className="flex items-center justify-between text-teal-300 mb-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Chapter Books</span>
-                        <BookOpen className="w-4 h-4 text-emerald-400" />
+                        <BookOpen className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
                       </div>
-                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                      <div className="text-xl sm:text-2xl font-black text-white font-mono">
                         {allBooks.length}
                       </div>
                       <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
                         Interactive Handbooks
                       </span>
-                    </div>
+                    </button>
 
-                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setBookHubActiveTab("slates")}
+                      className={`text-left transition-all border rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between group cursor-pointer ${
+                        bookHubActiveTab === "slates"
+                          ? "bg-white/20 border-white/40 ring-2 ring-teal-400/40 shadow-md"
+                          : "bg-white/5 hover:bg-white/10 border-white/10"
+                      }`}
+                    >
                       <div className="flex items-center justify-between text-teal-300 mb-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Board Slates</span>
-                        <Camera className="w-4 h-4 text-teal-400" />
+                        <Camera className="w-4 h-4 text-teal-400 group-hover:scale-110 transition-transform" />
                       </div>
-                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                      <div className="text-xl sm:text-2xl font-black text-white font-mono">
                         {allSnapshots.length}
                       </div>
                       <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
                         HD Chalk Captures
                       </span>
-                    </div>
+                    </button>
 
-                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
                       <div className="flex items-center justify-between text-teal-300 mb-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Smart Decks</span>
                         <Sparkles className="w-4 h-4 text-amber-400" />
                       </div>
-                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                      <div className="text-xl sm:text-2xl font-black text-white font-mono">
                         {allBooks.length}
                       </div>
                       <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
@@ -8641,101 +8685,344 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                       </span>
                     </div>
 
-                    <div className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xs flex flex-col justify-between">
                       <div className="flex items-center justify-between text-teal-300 mb-1">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Subject Scope</span>
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Disciplines</span>
                         <Layers className="w-4 h-4 text-sky-400" />
                       </div>
-                      <div className="text-lg sm:text-2xl font-black text-white font-mono">
+                      <div className="text-xl sm:text-2xl font-black text-white font-mono">
                         {Object.keys(bookSubjectCounts).filter(k => k !== "all" && bookSubjectCounts[k] > 0).length || 1}
                       </div>
                       <span className="text-[9.5px] text-teal-200/70 font-sans mt-0.5">
-                        Active Disciplines
+                        Active Subjects
                       </span>
                     </div>
                   </div>
 
-                  {/* Subject Quick Glance Bar */}
-                  <div className="flex items-center gap-2 pt-1 overflow-x-auto scrollbar-thin relative z-10 text-xs">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-teal-300/80 shrink-0 font-bold">
-                      Subject Distribution:
-                    </span>
-                    {[
-                      { key: "Mathematics", label: "Math", icon: "üìê", count: bookSubjectCounts.Mathematics || 0 },
-                      { key: "Physics", label: "Physics", icon: "‚ö°", count: bookSubjectCounts.Physics || 0 },
-                      { key: "Chemistry", label: "Chemistry", icon: "üß™", count: bookSubjectCounts.Chemistry || 0 },
-                      { key: "Biology", label: "Biology", icon: "üå±", count: bookSubjectCounts.Biology || 0 },
-                      { key: "Science", label: "Science", icon: "üî¨", count: bookSubjectCounts.Science || 0 }
-                    ]
-                      .filter(s => s.count > 0)
-                      .map((subj) => (
-                        <button
-                          key={subj.key}
-                          type="button"
-                          onClick={() => {
-                            setSelectedBookSubjectFilter(subj.key);
-                            setSelectedSnapshotSubjectFilter(subj.key);
-                          }}
-                          className={`px-2.5 py-1 rounded-xl font-mono text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
-                            selectedBookSubjectFilter.toLowerCase() === subj.key.toLowerCase()
-                              ? "bg-white text-[#0a3641] border-white shadow-xs font-black"
-                              : "bg-white/10 hover:bg-white/20 text-teal-100 border-white/15"
-                          }`}
-                        >
-                          <span>{subj.icon}</span>
-                          <span>{subj.label}</span>
-                          <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
-                            selectedBookSubjectFilter.toLowerCase() === subj.key.toLowerCase()
-                              ? "bg-[#0a3641] text-[#c4f500]"
-                              : "bg-white/20 text-white"
-                          }`}>
-                            {subj.count}
-                          </span>
-                        </button>
-                      ))}
+                  {/* Clean 2-Way Segmented Switcher Bar */}
+                  <div className="flex items-center justify-between gap-3 bg-black/40 p-1.5 rounded-2xl border border-teal-500/25 relative z-10">
+                    <div className="grid grid-cols-2 gap-1.5 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setBookHubActiveTab("books")}
+                        className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          bookHubActiveTab === "books"
+                            ? "bg-white text-[#0a3641] shadow-md font-black"
+                            : "text-teal-200 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        <span>Chapter Books</span>
+                        <span className={`px-1.5 py-0.2 rounded-md text-[9.5px] font-mono ${
+                          bookHubActiveTab === "books" ? "bg-[#0a3641] text-[#c4f500]" : "bg-white/20 text-white"
+                        }`}>
+                          {allBooks.length}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBookHubActiveTab("slates")}
+                        className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          bookHubActiveTab === "slates"
+                            ? "bg-white text-[#0a3641] shadow-md font-black"
+                            : "text-teal-200 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Board Slates</span>
+                        <span className={`px-1.5 py-0.2 rounded-md text-[9.5px] font-mono ${
+                          bookHubActiveTab === "slates" ? "bg-[#0a3641] text-[#c4f500]" : "bg-white/20 text-white"
+                        }`}>
+                          {allSnapshots.length}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-teal-200/80 pr-2">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{bookHubActiveTab === "books" ? "Showing Interactive Handbooks & AI Decks" : "Showing HD Blackboard Vector & Chalk Captures"}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Panel 1: Auto-Captured Blackboard Snapshots Gallery & Downloader */}
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-zinc-150">
-                    <div className="text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="p-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/60">
-                          <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </span>
-                        <h4 className="text-xs uppercase font-mono tracking-widest text-[#0a3641] font-black">
-                          Auto-Captured Blackboard Snapshots ({allSnapshots.length})
-                        </h4>
+                {/* UNIFIED FLOATING SEARCH & FILTER TOOLBAR */}
+                <div className="bg-white border border-zinc-200/80 rounded-2xl p-3 shadow-xs space-y-3">
+                  {/* Top Row: Search Input + View Controls */}
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 stroke-[2.5]" />
+                      <input
+                        ref={bookSearchInputRef}
+                        type="text"
+                        value={bookHubActiveTab === "books" ? archiveSearchQuery : snapshotSearchQuery}
+                        onChange={(e) => {
+                          if (bookHubActiveTab === "books") {
+                            setArchiveSearchQuery(e.target.value);
+                            setCurrentBookHorizontalIndex(0);
+                          } else {
+                            setSnapshotSearchQuery(e.target.value);
+                            setCurrentSnapshotHorizontalIndex(0);
+                          }
+                        }}
+                        placeholder={
+                          bookHubActiveTab === "books"
+                            ? "Search chapter books, topics, or formulas... (Press / to search)"
+                            : "Search blackboard slides by topic, formula, or concept... (Press / to search)"
+                        }
+                        className="w-full pl-10 pr-20 py-2.5 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-200 focus:border-teal-600 text-zinc-800 placeholder:text-zinc-400 rounded-xl text-xs font-mono transition-all focus:outline-none focus:ring-1 focus:ring-teal-600"
+                      />
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                        {(bookHubActiveTab === "books" ? archiveSearchQuery : snapshotSearchQuery) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (bookHubActiveTab === "books") {
+                                setArchiveSearchQuery("");
+                                setCurrentBookHorizontalIndex(0);
+                              } else {
+                                setSnapshotSearchQuery("");
+                                setCurrentSnapshotHorizontalIndex(0);
+                              }
+                            }}
+                            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 text-xs transition-colors cursor-pointer"
+                            title="Clear search"
+                          >
+                            ‚úï
+                          </button>
+                        ) : (
+                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono text-zinc-400 bg-zinc-200/60 border border-zinc-300 rounded-md">
+                            /
+                          </kbd>
+                        )}
                       </div>
-                      <p className="text-[10.5px] text-zinc-500 font-sans mt-1">
-                        High-fidelity vector & chalk slates captured in real-time as Cherry Ma'am writes derivations and diagrams.
-                      </p>
                     </div>
-                    <div className="flex items-center gap-2 self-start sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={handleBatchExportSnapshotsMarkdown}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-300 text-teal-900 text-[10px] font-mono font-bold transition-all cursor-pointer shadow-2xs"
-                        title="Export all blackboard derivations into a consolidated Markdown revision album"
-                      >
-                        <Download className="w-3 h-3 text-teal-700" />
-                        <span>Export Notes Album</span>
-                      </button>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50/80 border border-teal-200 text-teal-900 text-[9.5px] font-mono font-black shadow-2xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Live Sync
-                      </span>
+
+                    {/* Controls Dock: Sort + View Mode + Stepper + Export */}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-between md:justify-end">
+                      {bookHubActiveTab === "books" ? (
+                        <>
+                          {/* Sort Dropdown */}
+                          <div className="flex items-center gap-1 bg-zinc-50 px-2.5 py-1.5 rounded-xl border border-zinc-200 text-xs font-mono">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400 stroke-[2.5]" />
+                            <select
+                              value={bookSortOrder}
+                              onChange={(e) => setBookSortOrder(e.target.value as any)}
+                              className="text-xs font-bold text-zinc-700 bg-transparent border-none focus:outline-none cursor-pointer"
+                            >
+                              <option value="newest">Newest First</option>
+                              <option value="oldest">Oldest First</option>
+                              <option value="title">By Title</option>
+                              <option value="topics">Most Topics</option>
+                            </select>
+                          </div>
+
+                          {/* View Switcher: Grid vs Carousel */}
+                          <div className="inline-flex p-1 bg-zinc-100 rounded-xl border border-zinc-200/80">
+                            <button
+                              type="button"
+                              onClick={() => setBooksViewMode("grid")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                booksViewMode === "grid"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Grid View"
+                            >
+                              <Grid className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Grid</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setBooksViewMode("carousel")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                booksViewMode === "carousel"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Carousel View"
+                            >
+                              <Film className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Carousel</span>
+                            </button>
+                          </div>
+
+                          {/* Stepper for Books Carousel */}
+                          {booksViewMode === "carousel" && filteredBooks.length > 0 && (
+                            <div className="flex items-center gap-1.5 bg-zinc-50 px-2.5 py-1 rounded-xl border border-zinc-200">
+                              <span className="text-[10px] font-mono font-black text-[#0a3641]">
+                                {Math.min(currentBookHorizontalIndex + 1, filteredBooks.length)}/{filteredBooks.length}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleBooksHorizontalScroll("prev")}
+                                disabled={currentBookHorizontalIndex === 0}
+                                className="p-1 rounded-lg hover:bg-zinc-200 text-zinc-700 disabled:opacity-30 cursor-pointer"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBooksHorizontalScroll("next")}
+                                disabled={currentBookHorizontalIndex >= filteredBooks.length - 1}
+                                className="p-1 rounded-lg hover:bg-zinc-200 text-zinc-700 disabled:opacity-30 cursor-pointer"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* Export Album Button for Slates */}
+                          <button
+                            type="button"
+                            onClick={handleBatchExportSnapshotsMarkdown}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-300 text-teal-900 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs"
+                            title="Export all blackboard derivations into a consolidated Markdown revision album"
+                          >
+                            <Download className="w-3.5 h-3.5 text-teal-700" />
+                            <span>Export Album</span>
+                          </button>
+
+                          {/* View Switcher: Grid vs Carousel */}
+                          <div className="inline-flex p-1 bg-zinc-100 rounded-xl border border-zinc-200/80">
+                            <button
+                              type="button"
+                              onClick={() => setSnapshotsViewMode("grid")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                snapshotsViewMode === "grid"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Grid View"
+                            >
+                              <Grid className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Grid</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSnapshotsViewMode("carousel")}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                snapshotsViewMode === "carousel"
+                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
+                                  : "text-zinc-600 hover:text-zinc-900"
+                              }`}
+                              title="Carousel View"
+                            >
+                              <Film className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Carousel</span>
+                            </button>
+                          </div>
+
+                          {/* Stepper for Slates Carousel */}
+                          {snapshotsViewMode === "carousel" && filteredSnapshots.length > 1 && (
+                            <div className="flex items-center gap-1.5 bg-zinc-50 px-2.5 py-1 rounded-xl border border-zinc-200">
+                              <span className="text-[10px] font-mono font-black text-[#0a3641]">
+                                {currentSnapshotHorizontalIndex + 1}/{filteredSnapshots.length}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleSnapshotHorizontalScroll("prev")}
+                                disabled={currentSnapshotHorizontalIndex === 0}
+                                className="p-1 rounded-lg hover:bg-zinc-200 text-zinc-700 disabled:opacity-30 cursor-pointer"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSnapshotHorizontalScroll("next")}
+                                disabled={currentSnapshotHorizontalIndex >= filteredSnapshots.length - 1}
+                                className="p-1 rounded-lg hover:bg-zinc-200 text-zinc-700 disabled:opacity-30 cursor-pointer"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {allSnapshots && allSnapshots.length > 0 ? (
-                    <div className="space-y-3.5">
-                      {/* Subject Filter Pills Bar */}
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                  {/* Bottom Row: Subject Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-t border-zinc-100 pt-2">
+                    {bookHubActiveTab === "books" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBookSubjectFilter("all")}
+                          className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                            selectedBookSubjectFilter === "all"
+                              ? "bg-[#0a3641] text-white border-[#0a3641] shadow-xs font-black"
+                              : "bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border-zinc-200"
+                          }`}
+                        >
+                          <span>üìö</span>
+                          <span>All Books</span>
+                          <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
+                            selectedBookSubjectFilter === "all" ? "bg-white/20 text-[#c4f500]" : "bg-zinc-200/60 text-zinc-600"
+                          }`}>
+                            {allBooks.length}
+                          </span>
+                        </button>
+
+                        {/* Starred Books Pill */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBookSubjectFilter(selectedBookSubjectFilter === "starred" ? "all" : "starred")}
+                          className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                            selectedBookSubjectFilter === "starred"
+                              ? "bg-amber-500 text-white border-amber-500 shadow-xs font-black"
+                              : "bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border-zinc-200"
+                          }`}
+                        >
+                          <Star className={`w-3.5 h-3.5 ${selectedBookSubjectFilter === "starred" ? "fill-white text-white" : "text-amber-500"}`} />
+                          <span>Starred</span>
+                          <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
+                            selectedBookSubjectFilter === "starred" ? "bg-white/20 text-white" : "bg-zinc-200/60 text-zinc-600"
+                          }`}>
+                            {Object.values(starredBookIds).filter(Boolean).length}
+                          </span>
+                        </button>
+
                         {[
-                          { key: "all", label: "All Subjects", icon: "üìö", count: snapshotSubjectCounts.all || 0 },
-                          { key: "Mathematics", label: "Mathematics", icon: "üìê", count: snapshotSubjectCounts.Mathematics || 0 },
+                          { key: "Mathematics", label: "Math", icon: "üìê", count: bookSubjectCounts.Mathematics || 0 },
+                          { key: "Physics", label: "Physics", icon: "‚ö°", count: bookSubjectCounts.Physics || 0 },
+                          { key: "Chemistry", label: "Chemistry", icon: "üß™", count: bookSubjectCounts.Chemistry || 0 },
+                          { key: "Biology", label: "Biology", icon: "üå±", count: bookSubjectCounts.Biology || 0 },
+                          { key: "Science", label: "Science", icon: "üî¨", count: bookSubjectCounts.Science || 0 }
+                        ]
+                          .filter(s => s.count > 0 || s.key.toLowerCase() === (subject || "").toLowerCase())
+                          .map((subj) => {
+                            const isSelected = selectedBookSubjectFilter.toLowerCase() === subj.key.toLowerCase();
+                            return (
+                              <button
+                                key={subj.key}
+                                type="button"
+                                onClick={() => setSelectedBookSubjectFilter(subj.key)}
+                                className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                                  isSelected
+                                    ? "bg-[#0a3641] text-white border-[#0a3641] shadow-xs font-black"
+                                    : "bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border-zinc-200"
+                                }`}
+                              >
+                                <span>{subj.icon}</span>
+                                <span>{subj.label}</span>
+                                <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
+                                  isSelected ? "bg-white/20 text-[#c4f500]" : "bg-zinc-200/60 text-zinc-600"
+                                }`}>
+                                  {subj.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                      </>
+                    ) : (
+                      <>
+                        {[
+                          { key: "all", label: "All Slates", icon: "üì∏", count: snapshotSubjectCounts.all || 0 },
+                          { key: "Mathematics", label: "Math", icon: "üìê", count: snapshotSubjectCounts.Mathematics || 0 },
                           { key: "Physics", label: "Physics", icon: "‚ö°", count: snapshotSubjectCounts.Physics || 0 },
                           { key: "Chemistry", label: "Chemistry", icon: "üß™", count: snapshotSubjectCounts.Chemistry || 0 },
                           { key: "Biology", label: "Biology", icon: "üå±", count: snapshotSubjectCounts.Biology || 0 },
@@ -8750,109 +9037,517 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                 key={tab.key}
                                 type="button"
                                 onClick={() => setSelectedSnapshotSubjectFilter(tab.key)}
-                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border ${
+                                className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
                                   isSelected
-                                    ? "bg-gradient-to-r from-[#0a3641] to-[#082b34] text-white border-[#0a3641] shadow-xs font-black ring-1 ring-teal-500/30"
-                                    : "bg-white text-zinc-600 border-zinc-200 hover:bg-slate-50 hover:text-zinc-900 hover:border-zinc-300"
+                                    ? "bg-[#0a3641] text-white border-[#0a3641] shadow-xs font-black"
+                                    : "bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border-zinc-200"
                                 }`}
                               >
                                 <span>{tab.icon}</span>
                                 <span>{tab.label}</span>
-                                <span
-                                  className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md font-black ${
-                                    isSelected
-                                      ? "bg-white/20 text-[#c4f500]"
-                                      : "bg-zinc-100 text-zinc-600 border border-zinc-200/60"
-                                  }`}
-                                >
+                                <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
+                                  isSelected ? "bg-white/20 text-[#c4f500]" : "bg-zinc-200/60 text-zinc-600"
+                                }`}>
                                   {tab.count}
                                 </span>
                               </button>
                             );
                           })}
-                      </div>
+                      </>
+                    )}
 
-                      {/* Search Bar & Smart Layout Switcher */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                        <div className="relative flex-1">
-                          <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 stroke-[2.5]" />
-                          <input 
-                            type="text" 
-                            value={snapshotSearchQuery} 
-                            onChange={(e) => setSnapshotSearchQuery(e.target.value)} 
-                            placeholder="Search board slates by topic, formula, or concept..." 
-                            className="w-full pl-10 pr-9 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold placeholder:text-zinc-400 text-zinc-800 focus:outline-hidden focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-all font-mono shadow-2xs"
-                          />
-                          {snapshotSearchQuery && (
-                            <button 
-                              onClick={() => setSnapshotSearchQuery("")}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 text-xs font-mono font-bold"
+                    {/* Reset Filters Quick Button */}
+                    {((bookHubActiveTab === "books" && (selectedBookSubjectFilter !== "all" || archiveSearchQuery)) ||
+                      (bookHubActiveTab === "slates" && (selectedSnapshotSubjectFilter !== "all" || snapshotSearchQuery))) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (bookHubActiveTab === "books") {
+                            setSelectedBookSubjectFilter("all");
+                            setArchiveSearchQuery("");
+                          } else {
+                            setSelectedSnapshotSubjectFilter("all");
+                            setSnapshotSearchQuery("");
+                          }
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl font-mono text-[10.5px] text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all shrink-0 cursor-pointer ml-auto"
+                      >
+                        ‚úï Clear Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ACTIVE VIEWPORT: CHAPTER BOOKS VS BOARD SLATES */}
+                {bookHubActiveTab === "books" ? (
+                  <div className="space-y-4 animate-fade-in">
+                    {allBooks && allBooks.length > 0 ? (
+                      filteredBooks.length === 0 ? (
+                        <div className="border border-dashed border-zinc-200 rounded-3xl p-10 bg-zinc-50/60 text-center select-none space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-800 border border-teal-200/60 flex items-center justify-center text-xl mx-auto shadow-2xs">
+                            üìö
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-black text-zinc-700">No matching lecture books found</p>
+                            <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                              {archiveSearchQuery 
+                                ? `No chapter books matched "${archiveSearchQuery}". Try clearing search or selecting a different subject filter.`
+                                : "Try selecting a different subject tab to explore available board books."}
+                            </p>
+                          </div>
+                          {(archiveSearchQuery || selectedBookSubjectFilter !== "all") && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setArchiveSearchQuery("");
+                                setSelectedBookSubjectFilter("all");
+                              }}
+                              className="mt-2 px-4 py-2 bg-[#0a3641] hover:bg-teal-800 text-white rounded-xl text-xs font-bold font-mono transition-all cursor-pointer shadow-xs"
                             >
-                              ‚úï
+                              Reset All Filters & Show All Books
                             </button>
                           )}
                         </div>
+                      ) : booksViewMode === "grid" ? (
+                        /* Modernized High-Craft Responsive Grid for Chapter Books */
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 pt-1">
+                          {filteredBooks.map((sess, idx) => {
+                            const hasContent = !!(
+                              sess.customBoardContent ||
+                              sess.documentMarkdown ||
+                              sess.activeDocumentMarkdown ||
+                              (sess.topicBoardsContent && Object.keys(sess.topicBoardsContent).length > 0) ||
+                              (sess.topics && sess.topics.length > 0)
+                            );
+                            const isYoutubeSess = sess.processedTitle?.includes("YouTube") || sess.processedTitle?.includes("(ID: ");
+                            const bookSubject = sess.inferredSubject;
+                            const theme = getSubjectBookTheme(bookSubject);
+                            const topicCount = sess.topics && sess.topics.length > 0 ? sess.topics.length : 1;
+                            const isStarred = !!starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`];
 
-                        {/* View Switcher: Grid vs Carousel */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="inline-flex p-1 bg-zinc-100 rounded-xl border border-zinc-200/80 shadow-2xs">
-                            <button
-                              type="button"
-                              onClick={() => setSnapshotsViewMode("grid")}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                snapshotsViewMode === "grid"
-                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
-                                  : "text-zinc-600 hover:text-zinc-900"
-                              }`}
-                              title="Grid View (All slates at a glance)"
-                            >
-                              <Grid className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>Grid</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setSnapshotsViewMode("carousel")}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                snapshotsViewMode === "carousel"
-                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
-                                  : "text-zinc-600 hover:text-zinc-900"
-                              }`}
-                              title="Carousel View (Widescreen slider)"
-                            >
-                              <Film className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>Carousel</span>
-                            </button>
+                            // Extract preview topic snippets
+                            const previewTopics = sess.topics && Array.isArray(sess.topics) && sess.topics.length > 0
+                              ? sess.topics.slice(0, 2).map((t: string) => t.split("\n")[0]?.replace(/[#*_]/g, "").trim()).filter(Boolean)
+                              : [];
+
+                            return (
+                              <div
+                                key={sess.sessionId || sess.id || idx}
+                                className="group relative border border-zinc-200/85 hover:border-teal-500/50 rounded-2xl sm:rounded-3xl bg-white overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between hover:-translate-y-1"
+                              >
+                                {/* 3D Chalkboard Book Cover with Spine & Elevation Accent */}
+                                <div
+                                  onClick={() => setSelectedBookForReader(sess)}
+                                  className={`relative aspect-[16/10] bg-gradient-to-br from-[#041d17] via-[#082e25] to-[#031713] p-4 pl-7 sm:pl-8 flex flex-col justify-between cursor-pointer overflow-hidden border-b border-zinc-100 group/cover select-none ${theme.pageEdge}`}
+                                >
+                                  {/* Left 3D Binder Spine & Ring Effect */}
+                                  <div className="absolute left-0 top-0 bottom-0 w-5.5 sm:w-6 bg-gradient-to-r from-black/80 via-black/50 to-transparent flex flex-col items-center justify-around py-3 z-20 border-r border-white/10 shadow-inner">
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                  </div>
+
+                                  {/* Subject Accent Vertical Stripe on Spine */}
+                                  <div className={`absolute left-5 sm:left-5.5 top-0 bottom-0 w-[2.5px] bg-gradient-to-b ${theme.gradientBar} opacity-90 z-20`} />
+
+                                  {/* Subtle Grid & Radiant Glow */}
+                                  <div className="absolute inset-0 bg-[radial-gradient(#14b8a6_0.75px,transparent_0.75px)] [background-size:12px_12px] opacity-25 pointer-events-none" />
+                                  <div 
+                                    className="absolute -top-10 -right-10 w-36 h-36 rounded-full pointer-events-none blur-xl opacity-30 group-hover/cover:opacity-60 transition-opacity" 
+                                    style={{ background: theme.glowColor }}
+                                  />
+
+                                  {/* Top Badges & Star Button */}
+                                  <div className="relative z-10 flex items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-2.5 py-0.5 rounded-lg bg-black/60 text-[#c4f500] text-[9px] font-mono font-black uppercase backdrop-blur-md border border-teal-500/40 shadow-xs">
+                                        Book #{idx + 1}
+                                      </span>
+                                      {isYoutubeSess && (
+                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-red-600/90 text-white font-mono flex items-center gap-1 shadow-2xs">
+                                          <Youtube className="w-2.5 h-2.5" /> Video
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleStarBook(sess.sessionId || sess.id || `book_${sess.index || idx}`, e)}
+                                      className={`p-1.5 rounded-xl border transition-all cursor-pointer shadow-xs z-30 ${
+                                        isStarred
+                                          ? "bg-amber-400 text-slate-950 border-amber-500 shadow-md scale-105"
+                                          : "bg-black/40 hover:bg-black/70 text-zinc-300 hover:text-white border-white/20"
+                                      }`}
+                                      title={isStarred ? "Starred in Book Hub" : "Mark as Favorite Book"}
+                                    >
+                                      <Star className={`w-3.5 h-3.5 ${isStarred ? "fill-slate-950 text-slate-950" : ""}`} />
+                                    </button>
+                                  </div>
+
+                                  {/* Title & Board Watermark in Chalk Cover */}
+                                  <div className="relative z-10 space-y-1 my-auto">
+                                    <div className="flex items-center gap-1.5 opacity-85">
+                                      <span className="text-[8.5px] font-mono uppercase tracking-widest text-teal-300 font-bold">
+                                        {theme.name} ‚Ä¢ Class Handbook
+                                      </span>
+                                    </div>
+                                    <h4 className="text-xs sm:text-[13px] font-black text-white leading-snug line-clamp-2 drop-shadow-xs font-sans group-hover/cover:text-teal-200 transition-colors">
+                                      {sess.processedTitle}
+                                    </h4>
+                                  </div>
+
+                                  {/* Bottom slate meta */}
+                                  <div className="relative z-10 flex items-center justify-between text-[8.5px] font-mono text-teal-200/80 pt-1.5 border-t border-white/10">
+                                    <span className="truncate max-w-[120px]">{sess.formattedDateTime}</span>
+                                    <span className="font-bold text-[#c4f500] px-1.5 py-0.5 rounded-md bg-white/10">
+                                      {topicCount} {topicCount === 1 ? "Chapter" : "Chapters"}
+                                    </span>
+                                  </div>
+
+                                  {/* Hover overlay with Quick Read button */}
+                                  <div className="absolute inset-0 bg-[#061f19]/80 opacity-0 group-hover/cover:opacity-100 transition-all duration-200 flex items-center justify-center gap-1.5 backdrop-blur-[3px] z-30">
+                                    <span className="px-3.5 py-2 bg-white text-[#0a3641] rounded-2xl shadow-xl text-xs font-black flex items-center gap-1.5 transform translate-y-2 group-hover/cover:translate-y-0 transition-transform">
+                                      <BookOpen className="w-3.5 h-3.5 text-teal-700 stroke-[2.5]" /> Open Handbook
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Body with Topic Badges & Action Buttons */}
+                                <div className="p-3.5 sm:p-4 flex flex-col justify-between flex-1 space-y-3 bg-gradient-to-b from-white to-zinc-50/50">
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between text-[9.5px] font-mono">
+                                      <span className={`font-black px-2 py-0.5 rounded-lg border text-[8.5px] flex items-center gap-1 ${theme.badgeBg}`}>
+                                        <span>{theme.icon}</span>
+                                        <span>{bookSubject}</span>
+                                      </span>
+                                      <span className="text-zinc-600 font-bold bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200/70">
+                                        Lesson #{sess.index}
+                                      </span>
+                                    </div>
+
+                                    <h5 
+                                      onClick={() => setSelectedBookForReader(sess)}
+                                      className="text-xs font-bold text-[#0a3641] line-clamp-1 cursor-pointer hover:text-teal-700 transition-colors pt-0.5"
+                                      title={sess.processedTitle}
+                                    >
+                                      {sess.processedTitle}
+                                    </h5>
+
+                                    {/* Preview Topic Chips */}
+                                    {previewTopics.length > 0 && (
+                                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                                        {previewTopics.map((top: string, tIdx: number) => (
+                                          <span 
+                                            key={tIdx} 
+                                            className="text-[9px] font-mono text-zinc-500 bg-zinc-100/90 border border-zinc-200/70 px-1.5 py-0.5 rounded-md truncate max-w-[130px]"
+                                            title={top}
+                                          >
+                                            ‚Ä¢ {top}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Dual Action Buttons */}
+                                  <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-zinc-150">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedBookForReader(sess)}
+                                      className="py-2 px-2 rounded-xl text-[10.5px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 bg-[#0a3641] hover:bg-teal-900 text-white cursor-pointer active:scale-95 shadow-2xs font-mono"
+                                      title="Open Full Chalkboard Handbook"
+                                    >
+                                      <BookOpen className="w-3.5 h-3.5 text-teal-300 shrink-0 stroke-[2.5]" />
+                                      <span className="truncate">Read Book</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const cachedDeck = localStorage.getItem(`revision_deck_${sess.sessionId || sess.index}`);
+                                        if (cachedDeck) {
+                                          try {
+                                            const parsed = JSON.parse(cachedDeck);
+                                            const hasValidMindMap = parsed && parsed.mindMap && Array.isArray(parsed.mindMap.nodes) && parsed.mindMap.nodes.length > 0;
+                                            if (hasValidMindMap) {
+                                              handleOpenRevisionDeck(sess, parsed);
+                                              return;
+                                            }
+                                          } catch (_) {}
+                                        }
+                                        handleGenerateRevisionDeck(sess);
+                                      }}
+                                      disabled={!hasContent}
+                                      className={`py-2 px-2 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs font-mono ${
+                                        hasContent
+                                          ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white active:scale-95 shadow-amber-500/20"
+                                          : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
+                                      }`}
+                                      title={hasContent ? "Launch AI Flashcards & Mind Map" : "No notes available"}
+                                    >
+                                      <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                                      <span className="truncate">Revise</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        /* Modern Carousel View Mode */
+                        <div className="space-y-3">
+                          {/* Horizontal Scrolling Book Shelf */}
+                          <div 
+                            ref={booksScrollContainerRef}
+                            className="flex items-stretch gap-4 sm:gap-6 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-teal-700/30 scrollbar-track-zinc-100/60 px-1"
+                          >
+                            {filteredBooks.map((sess, idx) => {
+                              const hasContent = !!(
+                                sess.customBoardContent || 
+                                sess.documentMarkdown || 
+                                sess.activeDocumentMarkdown || 
+                                (sess.topicBoardsContent && Object.keys(sess.topicBoardsContent).length > 0) || 
+                                (sess.topics && sess.topics.length > 0)
+                              );
+                              const isYoutubeSess = sess.processedTitle?.includes("YouTube") || sess.processedTitle?.includes("(ID: ");
+                              const bookSubject = sess.inferredSubject;
+                              const theme = getSubjectBookTheme(bookSubject);
+                              const topicCount = sess.topics && sess.topics.length > 0 ? sess.topics.length : 1;
+                              const isStarred = !!starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`];
+
+                              return (
+                                <div
+                                  key={sess.sessionId || sess.id || idx}
+                                  className="w-[92vw] sm:w-[540px] md:w-[620px] lg:w-[680px] shrink-0 snap-center rounded-3xl border border-zinc-200/90 bg-white overflow-hidden shadow-sm hover:shadow-xl hover:border-teal-500/50 transition-all flex flex-col md:flex-row group"
+                                >
+                                  {/* Left: 3D Chalkboard Book Cover */}
+                                  <div 
+                                    onClick={() => setSelectedBookForReader(sess)}
+                                    className={`relative w-full md:w-5/12 aspect-[16/10] md:aspect-auto md:min-h-[280px] bg-gradient-to-br from-[#041d17] via-[#082e25] to-[#031713] p-5 pl-8 sm:pl-9 flex flex-col justify-between cursor-pointer overflow-hidden border-b md:border-b-0 md:border-r border-zinc-100 group/cover shrink-0 select-none ${theme.pageEdge}`}
+                                  >
+                                    {/* Left 3D Binder Spine & Ring Effect */}
+                                    <div className="absolute left-0 top-0 bottom-0 w-6 sm:w-7 bg-gradient-to-r from-black/80 via-black/50 to-transparent flex flex-col items-center justify-around py-4 z-20 border-r border-white/10 shadow-inner">
+                                      <div className="w-3 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                      <div className="w-3 h-0.5 bg-white/40 rounded-full shadow-2xs" />
+                                    </div>
+
+                                    {/* Subject Accent Vertical Stripe */}
+                                    <div className={`absolute left-5.5 sm:left-6.5 top-0 bottom-0 w-[3px] bg-gradient-to-b ${theme.gradientBar} opacity-90 z-20`} />
+
+                                    {/* Dot Grid Pattern & Radial Glow */}
+                                    <div className="absolute inset-0 bg-[radial-gradient(#14b8a6_0.75px,transparent_0.75px)] [background-size:12px_12px] opacity-25 pointer-events-none" />
+                                    <div 
+                                      className="absolute -top-12 -right-12 w-48 h-48 rounded-full pointer-events-none blur-2xl opacity-30 group-hover/cover:opacity-60 transition-opacity" 
+                                      style={{ background: theme.glowColor }}
+                                    />
+
+                                    {/* Top Badges */}
+                                    <div className="relative z-10 flex items-center justify-between gap-2">
+                                      <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[#c4f500] text-[9.5px] font-mono font-black uppercase backdrop-blur-md border border-teal-500/40 shadow-xs">
+                                        Book #{idx + 1}
+                                      </span>
+                                      {isYoutubeSess && (
+                                        <span className="text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md bg-red-600/90 text-white font-mono flex items-center gap-1 shadow-2xs">
+                                          <Youtube className="w-2.5 h-2.5" /> Video
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Cover Title */}
+                                    <div className="relative z-10 space-y-1.5 my-auto">
+                                      <span className="text-[9px] font-mono uppercase tracking-widest text-teal-300 font-bold">
+                                        {theme.name} ‚Ä¢ Class Handbook
+                                      </span>
+                                      <h4 className="text-sm sm:text-base font-black text-white leading-snug line-clamp-3 drop-shadow-xs font-sans group-hover/cover:text-teal-200 transition-colors">
+                                        {sess.processedTitle}
+                                      </h4>
+                                    </div>
+
+                                    {/* Bottom meta */}
+                                    <div className="relative z-10 flex items-center justify-between text-[9px] font-mono text-teal-200/80 pt-2 border-t border-white/10">
+                                      <span className="truncate max-w-[130px]">{sess.formattedDateTime}</span>
+                                      <span className="font-bold text-[#c4f500] px-2 py-0.5 rounded-md bg-white/10 border border-white/10">
+                                        {topicCount} Chapters
+                                      </span>
+                                    </div>
+
+                                    {/* Hover overlay with Quick Read button */}
+                                    <div className="absolute inset-0 bg-[#061f19]/80 opacity-0 group-hover/cover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 backdrop-blur-[3px] z-30">
+                                      <span className="px-4 py-2 bg-white text-[#0a3641] rounded-2xl shadow-xl text-xs font-black flex items-center gap-2 transform translate-y-2 group-hover/cover:translate-y-0 transition-transform">
+                                        <BookOpen className="w-4 h-4 text-teal-700 stroke-[2.5]" /> Open Handbook
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Book Meta, Topic Directory & Direct Action Drawer */}
+                                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4 bg-gradient-to-b from-white via-[#fcfdfe] to-zinc-50/50">
+                                    <div className="space-y-2.5">
+                                      {/* Header: Subject, Grade & Star Button */}
+                                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className={`text-[9.5px] font-mono font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 ${theme.badgeBg}`}>
+                                            <span>{theme.icon}</span>
+                                            <span>{bookSubject}</span>
+                                          </span>
+                                          <span className="text-[9px] font-mono font-bold text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200 shadow-2xs">
+                                            Lesson #{sess.index}
+                                          </span>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={(e) => toggleStarBook(sess.sessionId || sess.id || `book_${sess.index || idx}`, e)}
+                                          className={`p-1.5 rounded-xl border transition-all cursor-pointer shadow-2xs ${
+                                            isStarred
+                                              ? "bg-amber-400 text-slate-950 border-amber-500 shadow-md scale-105"
+                                              : "bg-zinc-50 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 border-zinc-200"
+                                          }`}
+                                          title={isStarred ? "Starred Book" : "Star this Book"}
+                                        >
+                                          <Star className={`w-3.5 h-3.5 ${isStarred ? "fill-slate-950 text-slate-950" : ""}`} />
+                                        </button>
+                                      </div>
+
+                                      {/* Book Title */}
+                                      <h5 
+                                        onClick={() => setSelectedBookForReader(sess)}
+                                        className="text-sm sm:text-base font-black text-[#0a3641] font-sans leading-snug cursor-pointer hover:text-teal-700 transition-colors"
+                                        title={sess.processedTitle}
+                                      >
+                                        {sess.processedTitle}
+                                      </h5>
+
+                                      {/* Chapters Directory Preview */}
+                                      <div className="space-y-1.5 pt-1">
+                                        <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                                          <span className="font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-1">
+                                            <ListOrdered className="w-3 h-3 text-teal-700" />
+                                            <span>Chapter Index ({topicCount})</span>
+                                          </span>
+                                          <span>{sess.formattedDateTime}</span>
+                                        </div>
+
+                                        {sess.topics && Array.isArray(sess.topics) && sess.topics.length > 0 ? (
+                                          <div className="space-y-1 max-h-24 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-200">
+                                            {sess.topics.slice(0, 4).map((top: string, tIdx: number) => {
+                                              const cleanTitle = top.split("\n")[0]?.replace(/[#*_]/g, "").trim() || `Chapter ${tIdx + 1}`;
+                                              return (
+                                                <div 
+                                                  key={tIdx}
+                                                  className="flex items-center gap-2 text-[10px] font-mono text-zinc-600 bg-zinc-50 hover:bg-teal-50/50 p-1.5 rounded-lg border border-zinc-200/60 transition-colors"
+                                                >
+                                                  <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[9px] font-bold flex items-center justify-center shrink-0">
+                                                    {tIdx + 1}
+                                                  </span>
+                                                  <span className="truncate">{cleanTitle}</span>
+                                                </div>
+                                              );
+                                            })}
+                                            {sess.topics.length > 4 && (
+                                              <p className="text-[9.5px] font-mono text-teal-700 font-bold pl-1 pt-0.5">
+                                                +{sess.topics.length - 4} more chapters in handbook...
+                                              </p>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <p className="text-[11px] text-zinc-400 italic">
+                                            Full interactive chalkboard notes & step-by-step whiteboard derivations.
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Action Buttons: Read Book & AI Smart Revision */}
+                                    <div className="pt-3 border-t border-zinc-150 flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedBookForReader(sess)}
+                                        className="flex-1 py-2.5 px-4 bg-[#0a3641] hover:bg-teal-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold uppercase font-mono tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                                        title="Open Full Chalkboard Handbook"
+                                      >
+                                        <BookOpen className="w-3.5 h-3.5 text-teal-300 stroke-[2.5]" />
+                                        <span>Read Handbook</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const cachedDeck = localStorage.getItem(`revision_deck_${sess.sessionId || sess.index}`);
+                                          if (cachedDeck) {
+                                            try {
+                                              const parsed = JSON.parse(cachedDeck);
+                                              const hasValidMindMap = parsed && parsed.mindMap && Array.isArray(parsed.mindMap.nodes) && parsed.mindMap.nodes.length > 0;
+                                              if (hasValidMindMap) {
+                                                handleOpenRevisionDeck(sess, parsed);
+                                                return;
+                                              }
+                                            } catch (_) {}
+                                          }
+                                          handleGenerateRevisionDeck(sess);
+                                        }}
+                                        disabled={!hasContent}
+                                        className={`py-2.5 px-4 rounded-xl text-xs font-bold uppercase font-mono tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
+                                          hasContent
+                                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white active:scale-[0.98] shadow-amber-500/20"
+                                            : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
+                                        }`}
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                                        <span>AI Revision</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
 
-                          {/* Navigation Controls in Carousel Mode */}
-                          {snapshotsViewMode === "carousel" && filteredSnapshots.length > 1 && (
-                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-zinc-200 shadow-2xs">
-                              <span className="text-[10px] font-mono font-black text-[#0a3641]">
-                                {currentSnapshotHorizontalIndex + 1}/{filteredSnapshots.length}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleSnapshotHorizontalScroll("prev")}
-                                disabled={currentSnapshotHorizontalIndex === 0}
-                                className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 cursor-pointer"
-                              >
-                                <ChevronLeft className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleSnapshotHorizontalScroll("next")}
-                                disabled={currentSnapshotHorizontalIndex >= filteredSnapshots.length - 1}
-                                className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 cursor-pointer"
-                              >
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </button>
+                          {/* Quick Jump Slide Dots */}
+                          {filteredBooks.length > 1 && (
+                            <div className="flex items-center justify-center gap-1.5 pt-1 overflow-x-auto scrollbar-none">
+                              {filteredBooks.map((_, dotIdx) => (
+                                <button
+                                  key={dotIdx}
+                                  type="button"
+                                  onClick={() => {
+                                    if (booksScrollContainerRef.current) {
+                                      const cardWidth = booksScrollContainerRef.current.firstElementChild?.clientWidth || 500;
+                                      booksScrollContainerRef.current.scrollTo({
+                                        left: dotIdx * (cardWidth + 24),
+                                        behavior: "smooth",
+                                      });
+                                    }
+                                  }}
+                                  className={`rounded-full transition-all cursor-pointer ${
+                                    Math.round(currentBookHorizontalIndex) === dotIdx
+                                      ? "w-7 h-2 bg-[#0a3641]"
+                                      : "w-2 h-2 bg-zinc-300 hover:bg-zinc-400"
+                                  }`}
+                                  title={`Jump to Book ${dotIdx + 1}`}
+                                />
+                              ))}
                             </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* Snapshots Content Rendering: Grid vs Carousel */}
-                      {filteredSnapshots.length === 0 ? (
+                      )
+                  ) : (
+                    <div className="border border-dashed border-zinc-200 rounded-2xl p-8 bg-zinc-50/50 text-center select-none space-y-2">
+                      <p className="text-xs font-black text-zinc-500">Archive Locker Empty</p>
+                      <p className="text-[10px] text-zinc-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                        Once you conduct or complete live classrooms with Cherry Ma'am, your completed board-books will compile and archive here automatically under secure token sync.
+                      </p>
+                    </div>
+                  )}
+                </div>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                {allSnapshots && allSnapshots.length > 0 ? (
+                  filteredSnapshots.length === 0 ? (
                         <div className="border border-dashed border-zinc-200 rounded-2xl p-8 bg-zinc-50/50 text-center select-none space-y-2">
                           <p className="text-xs font-black text-zinc-600">No matching blackboard snapshots found</p>
                           <p className="text-[10.5px] text-zinc-400 max-w-sm mx-auto">
@@ -8871,19 +9566,19 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                           )}
                         </div>
                       ) : snapshotsViewMode === "grid" ? (
-                        /* Modern Responsive Grid View */
+                        /* Modern Responsive Grid View for Board Slates */
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
                           {filteredSnapshots.map((snap, idx) => {
                             const snapSubject = snap.subject || inferSnapshotSubject(snap);
                             return (
                               <div
                                 key={snap.id || snap.snapshotId || idx}
-                                className="group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all flex flex-col justify-between"
+                                className="group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-xl hover:border-teal-500/50 transition-all duration-300 flex flex-col justify-between hover:-translate-y-0.5"
                               >
-                                {/* Thumbnail */}
+                                {/* Thumbnail Frame */}
                                 <div
                                   onClick={() => setSelectedSnapshotForModal(snap)}
-                                  className="relative aspect-[16/10] bg-[#071f18] overflow-hidden cursor-pointer flex items-center justify-center border-b border-zinc-100 group/slate"
+                                  className="relative aspect-[16/10] bg-[#071f18] overflow-hidden cursor-pointer flex items-center justify-center border-b border-zinc-100 group/slate select-none"
                                 >
                                   {snap.imgData ? (
                                     <img 
@@ -8897,28 +9592,28 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                       Blackboard Slate
                                     </div>
                                   )}
-                                  <div className="absolute inset-0 bg-[#0a3641]/40 opacity-0 group-hover/slate:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[2px]">
-                                    <span className="px-2.5 py-1.5 bg-white/95 text-[#0a3641] rounded-lg shadow-md text-[10.5px] font-black flex items-center gap-1.5">
-                                      <ZoomIn className="w-3.5 h-3.5 text-teal-700" /> Zoom
+                                  <div className="absolute inset-0 bg-[#0a3641]/50 opacity-0 group-hover/slate:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[2px]">
+                                    <span className="px-3 py-1.5 bg-white text-[#0a3641] rounded-xl shadow-md text-xs font-black flex items-center gap-1.5">
+                                      <ZoomIn className="w-3.5 h-3.5 text-teal-700" /> Inspect
                                     </span>
                                   </div>
-                                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-[#07242b]/90 text-[#c4f500] text-[9px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/30">
+                                  <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg bg-[#07242b]/90 text-[#c4f500] text-[9px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/30 shadow-xs">
                                     Slate #{idx + 1}
                                   </span>
                                 </div>
 
                                 {/* Body */}
-                                <div className="p-3.5 flex flex-col justify-between flex-1 space-y-3">
+                                <div className="p-3.5 sm:p-4 flex flex-col justify-between flex-1 space-y-3 bg-gradient-to-b from-white to-zinc-50/50">
                                   <div className="space-y-1.5">
                                     <div className="flex items-center justify-between gap-1">
-                                      <span className="text-[9px] font-mono font-black px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200/60">
+                                      <span className="text-[9px] font-mono font-black px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/70">
                                         {snapSubject}
                                       </span>
                                       <span className="text-[8.5px] font-mono text-zinc-400">
                                         {formatDate(snap.timestamp)}
                                       </span>
                                     </div>
-                                    <h5 className="text-xs font-black text-[#0a3641] font-sans leading-snug line-clamp-1">
+                                    <h5 className="text-xs font-black text-[#0a3641] font-sans leading-snug line-clamp-1 pt-0.5">
                                       {snap.topicTitle || "Classroom Board Snapshot"}
                                     </h5>
                                     <p className="text-[10px] text-zinc-500 line-clamp-2 leading-relaxed">
@@ -8927,20 +9622,20 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                   </div>
 
                                   {/* Actions */}
-                                  <div className="pt-2 border-t border-zinc-100 flex items-center gap-1.5">
+                                  <div className="pt-2 border-t border-zinc-150 flex items-center gap-1.5">
                                     <button
                                       type="button"
                                       onClick={() => handleDownloadImage(snap)}
-                                      className="flex-1 py-1.5 px-2.5 bg-gradient-to-r from-teal-700 to-[#0a3641] hover:from-teal-600 hover:to-teal-900 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                                      className="flex-1 py-1.5 px-2.5 bg-[#0a3641] hover:bg-teal-900 text-white rounded-xl text-[10.5px] font-bold font-mono uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
                                       title="Download high-definition blackboard JPG"
                                     >
-                                      <Download className="w-3 h-3 stroke-[2.5]" />
+                                      <Download className="w-3 h-3 stroke-[2.5] text-teal-300" />
                                       <span>Download</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setSelectedSnapshotForModal(snap)}
-                                      className="p-1.5 bg-zinc-50 hover:bg-teal-50 text-zinc-600 hover:text-teal-800 rounded-lg border border-zinc-200 cursor-pointer"
+                                      className="p-1.5 bg-zinc-50 hover:bg-teal-50 text-zinc-600 hover:text-teal-800 rounded-xl border border-zinc-200 cursor-pointer shadow-2xs"
                                       title="Zoom in Fullscreen"
                                     >
                                       <ZoomIn className="w-3.5 h-3.5" />
@@ -8948,7 +9643,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteSnapshot(snap.id || snap.snapshotId)}
-                                      className="p-1.5 bg-zinc-50 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-lg border border-zinc-200 cursor-pointer"
+                                      className="p-1.5 bg-zinc-50 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-xl border border-zinc-200 cursor-pointer shadow-2xs"
                                       title="Delete snapshot"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -8960,25 +9655,23 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                           })}
                         </div>
                       ) : (
+                        /* Carousel View for Board Slates */
                         <div className="space-y-3">
-                          {/* Horizontal Scrolling Snapshot Container (Each container box is ~screen length wide) */}
                           <div 
                             ref={snapshotScrollContainerRef}
-                            onScroll={handleSnapshotScrollUpdate}
-                            className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-2 pt-1 scroll-smooth scrollbar-thin rounded-2xl select-none"
-                            style={{ scrollSnapType: "x mandatory" }}
+                            className="flex items-stretch gap-4 sm:gap-6 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-teal-700/30 scrollbar-track-zinc-100/60 px-1"
                           >
                             {filteredSnapshots.map((snap, idx) => {
                               const snapSubject = snap.subject || inferSnapshotSubject(snap);
                               return (
-                                <div 
+                                <div
                                   key={snap.id || snap.snapshotId || idx}
-                                  className="w-full min-w-full flex-shrink-0 snap-center group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all flex flex-col md:flex-row"
+                                  className="w-[92vw] sm:w-[560px] md:w-[640px] lg:w-[720px] shrink-0 snap-center rounded-3xl border border-zinc-200/90 bg-white overflow-hidden shadow-sm hover:shadow-xl hover:border-teal-500/50 transition-all flex flex-col md:flex-row group"
                                 >
-                                  {/* Left/Top: High-Definition Widescreen Blackboard Slate */}
+                                  {/* Left: High-Definition Widescreen Blackboard Slate */}
                                   <div 
                                     onClick={() => setSelectedSnapshotForModal(snap)}
-                                    className="relative w-full md:w-3/5 lg:w-2/3 h-56 sm:h-64 md:h-76 bg-[#071f18] overflow-hidden cursor-pointer flex items-center justify-center border-b md:border-b-0 md:border-r border-zinc-100 shrink-0 group/slate"
+                                    className="relative w-full md:w-3/5 lg:w-2/3 h-56 sm:h-64 md:h-76 bg-[#071f18] overflow-hidden cursor-pointer flex items-center justify-center border-b md:border-b-0 md:border-r border-zinc-100 shrink-0 group/slate select-none"
                                   >
                                     {snap.imgData ? (
                                       <img 
@@ -9002,7 +9695,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                     </span>
                                   </div>
 
-                                  {/* Right/Bottom: Topic Details, Subject & Direct Actions */}
+                                  {/* Right: Topic Details, Subject & Direct Actions */}
                                   <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4 bg-gradient-to-b from-white via-[#fcfdfe] to-zinc-50/50">
                                     <div className="space-y-2.5">
                                       {/* Subject & Grade Badge */}
@@ -9037,15 +9730,15 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Action Buttons: Direct High-Def JPG Download, Fullscreen & Delete */}
+                                    {/* Action Buttons */}
                                     <div className="pt-3.5 border-t border-zinc-150 flex items-center gap-2">
                                       <button
                                         type="button"
                                         onClick={() => handleDownloadImage(snap)}
-                                        className="flex-1 py-2.5 px-3.5 bg-gradient-to-r from-teal-700 to-[#0a3641] hover:from-teal-600 hover:to-teal-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold uppercase font-mono tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                                        className="flex-1 py-2.5 px-3.5 bg-[#0a3641] hover:bg-teal-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold uppercase font-mono tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                                         title="Download high-definition blackboard image"
                                       >
-                                        <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <Download className="w-3.5 h-3.5 stroke-[2.5] text-teal-300" />
                                         <span>Download Slide JPG</span>
                                       </button>
                                       <button
@@ -9062,7 +9755,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                         className="p-2.5 bg-zinc-50 hover:bg-red-50 hover:border-red-200 text-zinc-400 hover:text-red-600 rounded-xl transition-colors cursor-pointer border border-zinc-200 shadow-2xs"
                                         title="Delete snapshot from archive"
                                       >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-4 h-4 stroke-[2]" />
                                       </button>
                                     </div>
                                   </div>
@@ -9071,7 +9764,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                             })}
                           </div>
 
-                          {/* Quick Jump Slide Pill Steppers */}
+                          {/* Quick Jump Slide Dots */}
                           {filteredSnapshots.length > 1 && (
                             <div className="flex items-center justify-center gap-1.5 pt-1 overflow-x-auto scrollbar-none">
                               {filteredSnapshots.map((_, dotIdx) => (
@@ -9080,12 +9773,15 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                                   type="button"
                                   onClick={() => {
                                     if (snapshotScrollContainerRef.current) {
-                                      const w = snapshotScrollContainerRef.current.clientWidth;
-                                      snapshotScrollContainerRef.current.scrollTo({ left: dotIdx * w, behavior: "smooth" });
+                                      const cardWidth = snapshotScrollContainerRef.current.clientWidth;
+                                      snapshotScrollContainerRef.current.scrollTo({
+                                        left: dotIdx * cardWidth,
+                                        behavior: "smooth",
+                                      });
                                       setCurrentSnapshotHorizontalIndex(dotIdx);
                                     }
                                   }}
-                                  className={`transition-all rounded-full cursor-pointer ${
+                                  className={`rounded-full transition-all cursor-pointer ${
                                     dotIdx === currentSnapshotHorizontalIndex
                                       ? "w-7 h-2 bg-[#0a3641]"
                                       : "w-2 h-2 bg-zinc-300 hover:bg-zinc-400"
@@ -9096,8 +9792,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      )
                   ) : (
                     <div className="border border-dashed border-teal-200/80 rounded-2xl p-8 bg-teal-50/25 text-center select-none space-y-2.5">
                       <div className="w-12 h-12 rounded-2xl bg-teal-100/70 text-teal-800 flex items-center justify-center mx-auto text-xl font-bold shadow-inner">
@@ -9110,615 +9805,7 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
                     </div>
                   )}
                 </div>
-
-                {/* Panel 2: Past Sessions Board-Book Arc Archives Block (Horizontal Screen-Length Scroll & Subject Filters) */}
-                <div className="space-y-4 pt-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 pb-2">
-                    <div className="text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="p-1.5 rounded-xl bg-teal-50 text-teal-800 border border-teal-200/60 shadow-2xs">
-                          <Sparkles className="w-3.5 h-3.5 stroke-[2.5] text-amber-600" />
-                        </span>
-                        <h4 className="text-xs uppercase font-mono tracking-widest text-[#0a3641] font-black">
-                          Subject-Wise Chapter Smart Revision Decks & Books ({filteredBooks.length})
-                        </h4>
-                      </div>
-                      <p className="text-[10.5px] text-zinc-500 font-sans mt-1">
-                        Interactive AI-powered revision flashcards, key takeaway concepts & dynamic mind maps organized by subject.
-                      </p>
-                    </div>
-
-                    {filteredBooks.length > 0 && (
-                      <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/70 self-start sm:self-auto shrink-0 shadow-2xs">
-                        {filteredBooks.length} {filteredBooks.length === 1 ? "Book" : "Books"} Available
-                      </span>
-                    )}
-                  </div>
-
-                  {pastSessions && pastSessions.length > 0 ? (
-                    <div className="space-y-3.5">
-                      {/* Subject Selection Tabs / Pills Bar */}
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none select-none">
-                        {[
-                          { key: "all", label: "All Subjects", icon: "üìö", count: bookSubjectCounts.all || allBooks.length },
-                          { key: "starred", label: "Starred Books", icon: "‚≠ê", count: bookSubjectCounts.starred || 0 },
-                          { key: "Mathematics", label: "Mathematics", icon: "üìê", count: bookSubjectCounts.Mathematics || 0 },
-                          { key: "Physics", label: "Physics", icon: "‚ö°", count: bookSubjectCounts.Physics || 0 },
-                          { key: "Chemistry", label: "Chemistry", icon: "üß™", count: bookSubjectCounts.Chemistry || 0 },
-                          { key: "Biology", label: "Biology", icon: "üå±", count: bookSubjectCounts.Biology || 0 },
-                          { key: "Science", label: "Science", icon: "üî¨", count: bookSubjectCounts.Science || 0 },
-                          ...Object.keys(bookSubjectCounts)
-                            .filter(k => !["all", "starred", "Mathematics", "Physics", "Chemistry", "Biology", "Science"].includes(k) && bookSubjectCounts[k] > 0)
-                            .map(k => ({ key: k, label: k, icon: "üìñ", count: bookSubjectCounts[k] }))
-                        ]
-                          .filter(tab => tab.key === "all" || tab.count > 0)
-                          .map((tab) => {
-                            const isActive = selectedBookSubjectFilter.toLowerCase() === tab.key.toLowerCase();
-                            return (
-                              <button
-                                key={tab.key}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedBookSubjectFilter(tab.key);
-                                  setCurrentBookHorizontalIndex(0);
-                                  if (booksScrollContainerRef.current) {
-                                    booksScrollContainerRef.current.scrollTo({ left: 0, behavior: "smooth" });
-                                  }
-                                }}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 border ${
-                                  isActive
-                                    ? "bg-[#0a3641] text-white border-[#0a3641] shadow-xs"
-                                    : "bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200 shadow-2xs hover:border-zinc-300"
-                                }`}
-                              >
-                                <span>{tab.icon}</span>
-                                <span>{tab.label}</span>
-                                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                                  isActive ? "bg-white/20 text-[#c4f500]" : "bg-zinc-100 text-zinc-600"
-                                }`}>
-                                  {tab.count}
-                                </span>
-                              </button>
-                            );
-                          })}
-                      </div>
-
-                      {/* Search Bar + Sort & View Mode Controls */}
-                      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 pt-0.5">
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                          <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 stroke-[2.5]" />
-                          <input 
-                            type="text" 
-                            value={archiveSearchQuery} 
-                            onChange={(e) => {
-                              setArchiveSearchQuery(e.target.value);
-                              setCurrentBookHorizontalIndex(0);
-                              if (booksScrollContainerRef.current) {
-                                booksScrollContainerRef.current.scrollTo({ left: 0, behavior: "smooth" });
-                              }
-                            }} 
-                            placeholder="Search chapter books by title, topic, or date..." 
-                            className="w-full pl-10 pr-10 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold placeholder:text-zinc-400 text-zinc-800 focus:outline-hidden focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-all font-mono shadow-2xs"
-                          />
-                          {archiveSearchQuery && (
-                            <button 
-                              onClick={() => {
-                                setArchiveSearchQuery("");
-                                setCurrentBookHorizontalIndex(0);
-                              }}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 text-xs font-mono font-bold cursor-pointer"
-                            >
-                              ‚úï
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Controls Toolbar: Sort Selector + Layout Mode + Stepper */}
-                        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
-                          {/* Sort Dropdown */}
-                          <div className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-zinc-200 shadow-2xs">
-                            <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400 stroke-[2.5]" />
-                            <select
-                              value={bookSortOrder}
-                              onChange={(e) => setBookSortOrder(e.target.value as any)}
-                              className="text-xs font-bold text-zinc-700 bg-transparent border-none focus:outline-hidden cursor-pointer"
-                            >
-                              <option value="newest">Newest First</option>
-                              <option value="oldest">Oldest First</option>
-                              <option value="title">By Chapter Title</option>
-                              <option value="topics">Most Topics</option>
-                            </select>
-                          </div>
-
-                          {/* View Switcher: Grid vs Carousel */}
-                          <div className="inline-flex p-1 bg-zinc-100 rounded-xl border border-zinc-200/80 shadow-2xs">
-                            <button
-                              type="button"
-                              onClick={() => setBooksViewMode("grid")}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                booksViewMode === "grid"
-                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
-                                  : "text-zinc-600 hover:text-zinc-900"
-                              }`}
-                              title="Grid View (All books at a glance)"
-                            >
-                              <Grid className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>Grid</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setBooksViewMode("carousel")}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                booksViewMode === "carousel"
-                                  ? "bg-white text-[#0a3641] shadow-xs font-black border border-zinc-200/60"
-                                  : "text-zinc-600 hover:text-zinc-900"
-                              }`}
-                              title="Carousel View (Widescreen slider)"
-                            >
-                              <Film className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>Carousel</span>
-                            </button>
-                          </div>
-
-                          {/* Slide Stepper Controls (Carousel Mode Only) */}
-                          {booksViewMode === "carousel" && filteredBooks.length > 0 && (
-                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-zinc-200 shadow-2xs">
-                              <span className="text-[10px] font-mono font-black text-[#0a3641]">
-                                {Math.min(currentBookHorizontalIndex + 1, filteredBooks.length)}/{filteredBooks.length}
-                              </span>
-                              <div className="flex items-center gap-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleBooksHorizontalScroll("prev")}
-                                  disabled={currentBookHorizontalIndex === 0}
-                                  className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
-                                  title="Previous Book Slide"
-                                >
-                                  <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleBooksHorizontalScroll("next")}
-                                  disabled={currentBookHorizontalIndex >= filteredBooks.length - 1}
-                                  className="p-1 rounded-lg hover:bg-teal-50 text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
-                                  title="Next Book Slide"
-                                >
-                                  <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Content: Empty Search / Books Grid vs Carousel View */}
-                      {filteredBooks.length === 0 ? (
-                        <div className="border border-dashed border-zinc-200 rounded-2xl p-8 bg-zinc-50/50 text-center select-none space-y-1">
-                          <p className="text-xs font-black text-zinc-500">No matching lecture books found</p>
-                          <p className="text-[10px] text-zinc-400">Try adjusting your keyword search or selected subject filter.</p>
-                        </div>
-                      ) : booksViewMode === "grid" ? (
-                        /* Responsive Grid View for Chapter Books with 3D Binder Aesthetic */
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
-                          {filteredBooks.map((sess, idx) => {
-                            const hasContent = !!(
-                              sess.customBoardContent || 
-                              sess.documentMarkdown || 
-                              sess.activeDocumentMarkdown || 
-                              (sess.topicBoardsContent && Object.keys(sess.topicBoardsContent).length > 0) || 
-                              (sess.topics && sess.topics.length > 0)
-                            );
-                            const isYoutubeSess = sess.processedTitle?.includes("YouTube") || sess.processedTitle?.includes("(ID: ");
-                            const bookSubject = sess.inferredSubject;
-                            const theme = getSubjectBookTheme(bookSubject);
-                            const topicCount = sess.topics && sess.topics.length > 0 ? sess.topics.length : 1;
-
-                            return (
-                              <div
-                                key={sess.sessionId || sess.id || idx}
-                                className="group relative border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-lg hover:border-teal-500/50 transition-all duration-300 flex flex-col justify-between hover:-translate-y-0.5"
-                              >
-                                {/* 3D Chalkboard Book Cover with Spine & Page-Edge Accent */}
-                                <div
-                                  onClick={() => setSelectedBookForReader(sess)}
-                                  className={`relative aspect-[16/10] bg-gradient-to-br from-[#061f19] via-[#092d24] to-[#041a15] p-3.5 pl-7 sm:pl-8 flex flex-col justify-between cursor-pointer overflow-hidden border-b border-zinc-100 group/cover select-none ${theme.pageEdge}`}
-                                >
-                                  {/* Left 3D Binder Spine & Ring Effect */}
-                                  <div className="absolute left-0 top-0 bottom-0 w-5 sm:w-6 bg-gradient-to-r from-black/60 via-black/30 to-transparent flex flex-col items-center justify-around py-3 z-20 border-r border-white/10 shadow-inner">
-                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                    <div className="w-2.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                  </div>
-
-                                  {/* Subject Accent Vertical Stripe on Spine */}
-                                  <div className={`absolute left-5 sm:left-6 top-0 bottom-0 w-[2.5px] bg-gradient-to-b ${theme.gradientBar} opacity-80 z-20`} />
-
-                                  {/* Grid & Chalk texture */}
-                                  <div className="absolute inset-0 bg-[radial-gradient(#14b8a6_0.75px,transparent_0.75px)] [background-size:12px_12px] opacity-20 pointer-events-none" />
-                                  <div 
-                                    className="absolute -top-10 -right-10 w-36 h-36 rounded-full opacity-25 pointer-events-none opacity-40" 
-                                    style={{ background: theme.glowColor }}
-                                  />
-
-                                  {/* Top Badges & Star Button */}
-                                  <div className="relative z-10 flex items-center justify-between gap-1">
-                                    <div className="flex items-center gap-1">
-                                      <span className="px-2 py-0.5 rounded-md bg-[#07242b]/95 text-[#c4f500] text-[8.5px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/40 shadow-2xs">
-                                        Book #{idx + 1}
-                                      </span>
-                                      {isYoutubeSess && (
-                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-red-600/95 text-white font-mono flex items-center gap-1 shadow-2xs">
-                                          <Youtube className="w-2.5 h-2.5" /> Video
-                                        </span>
-                                      )}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => toggleStarBook(sess.sessionId || sess.id || `book_${sess.index || idx}`, e)}
-                                      className={`p-1 rounded-md border transition-all cursor-pointer shadow-2xs z-30 ${
-                                        starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`]
-                                          ? "bg-amber-400 text-slate-950 border-amber-500 shadow-sm"
-                                          : "bg-black/40 hover:bg-black/60 text-white/70 hover:text-white border-white/20"
-                                      }`}
-                                      title={starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "Remove from Starred" : "Star / Bookmark this book"}
-                                    >
-                                      <Star className={`w-3 h-3 ${starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "fill-slate-950" : ""}`} />
-                                    </button>
-                                  </div>
-
-                                  {/* Center Title & Subject */}
-                                  <div className="relative z-10 space-y-1 my-auto pr-1">
-                                    <div className="flex items-center gap-1.5 text-[9.5px] font-mono font-bold tracking-wide" style={{ color: theme.tagColor }}>
-                                      <span>{theme.icon}</span>
-                                      <span className="uppercase">{bookSubject}</span>
-                                    </div>
-                                    <h4 className="text-xs font-black text-white leading-snug line-clamp-2 drop-shadow-2xs font-sans group-hover/cover:text-teal-200 transition-colors">
-                                      {sess.processedTitle}
-                                    </h4>
-                                  </div>
-
-                                  {/* Bottom slate meta */}
-                                  <div className="relative z-10 flex items-center justify-between text-[8px] font-mono text-teal-200/80 pt-1 border-t border-white/10">
-                                    <span className="truncate max-w-[110px]">{sess.formattedDateTime}</span>
-                                    <span className="font-bold text-[#c4f500]">{topicCount} {topicCount === 1 ? "Topic" : "Topics"}</span>
-                                  </div>
-
-                                  {/* Hover overlay with Quick Read button */}
-                                  <div className="absolute inset-0 bg-[#061f19]/75 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[2px] z-30">
-                                    <span className="px-3 py-1.5 bg-white text-[#0a3641] rounded-xl shadow-lg text-[10.5px] font-black flex items-center gap-1.5 transform translate-y-1 group-hover/cover:translate-y-0 transition-transform">
-                                      <BookOpen className="w-3 h-3 text-teal-700" /> Read Notes
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Body & Dual Action Buttons */}
-                                <div className="p-3 flex flex-col justify-between flex-1 space-y-2.5 bg-gradient-to-b from-white to-zinc-50/40">
-                                  <div className="space-y-1">
-                                    <div className="flex items-center justify-between text-[9px] font-mono">
-                                      <span className={`font-black px-1.5 py-0.5 rounded-md border text-[8.5px] ${theme.badgeBg}`}>
-                                        {theme.icon} {bookSubject}
-                                      </span>
-                                      <span className="text-zinc-600 font-bold bg-zinc-100 px-1.5 py-0.5 rounded-md">
-                                        Lesson #{sess.index}
-                                      </span>
-                                    </div>
-                                    <h5 
-                                      onClick={() => setSelectedBookForReader(sess)}
-                                      className="text-xs font-bold text-[#0a3641] line-clamp-1 cursor-pointer hover:text-teal-700 transition-colors pt-0.5"
-                                    >
-                                      {sess.processedTitle}
-                                    </h5>
-                                  </div>
-
-                                  {/* Dual Actions: Quick Read & Smart Revision */}
-                                  <div className="grid grid-cols-2 gap-1.5 pt-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedBookForReader(sess)}
-                                      className="py-1.5 px-2 rounded-xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 cursor-pointer active:scale-95 shadow-2xs"
-                                      title="Open In-App Textbook & Formula Reader"
-                                    >
-                                      <BookOpen className="w-3 h-3 text-teal-700 shrink-0" />
-                                      <span className="truncate">Read</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const cachedDeck = localStorage.getItem(`revision_deck_${sess.sessionId || sess.index}`);
-                                        if (cachedDeck) {
-                                          try {
-                                            const parsed = JSON.parse(cachedDeck);
-                                            const hasValidMindMap = parsed && parsed.mindMap && Array.isArray(parsed.mindMap.nodes) && parsed.mindMap.nodes.length > 0;
-                                            if (hasValidMindMap) {
-                                              handleOpenRevisionDeck(sess, parsed);
-                                              return;
-                                            }
-                                          } catch (_) {}
-                                        }
-                                        handleGenerateRevisionDeck(sess);
-                                      }}
-                                      disabled={!hasContent}
-                                      className={`py-1.5 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs ${
-                                        hasContent
-                                          ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white active:scale-95 shadow-amber-500/20"
-                                          : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
-                                      }`}
-                                      title={hasContent ? "Launch AI Flashcards & Mind Map" : "No notes available"}
-                                    >
-                                      <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
-                                      <span className="truncate">Revise</span>
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Horizontal Snap Scrolling Ribbon */}
-                          <div 
-                            ref={booksScrollContainerRef}
-                            onScroll={handleBooksScrollUpdate}
-                            className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-2 pt-1 scroll-smooth scrollbar-thin rounded-2xl"
-                            style={{ scrollbarWidth: "thin" }}
-                          >
-                            {filteredBooks.map((sess, idx) => {
-                              const hasContent = !!(
-                                sess.customBoardContent || 
-                                sess.documentMarkdown || 
-                                sess.activeDocumentMarkdown || 
-                                (sess.topicBoardsContent && Object.keys(sess.topicBoardsContent).length > 0) || 
-                                (sess.topics && sess.topics.length > 0)
-                              );
-                              const isYoutubeSess = sess.processedTitle?.includes("YouTube") || sess.processedTitle?.includes("(ID: ");
-                              const bookSubject = sess.inferredSubject;
-                              const theme = getSubjectBookTheme(bookSubject);
-                              const topicCount = sess.topics && sess.topics.length > 0 ? sess.topics.length : 1;
-                              
-                              // Topics preview list
-                              const topicsList = sess.topics && Array.isArray(sess.topics) && sess.topics.length > 0
-                                ? sess.topics.slice(0, 3).map((t: string) => t.split("\n")[0]?.replace(/[\#\*\_]/g, "").trim()).filter(Boolean)
-                                : [];
-
-                              return (
-                                <div 
-                                  key={sess.sessionId || sess.id || idx}
-                                  className="w-full min-w-full flex-shrink-0 snap-center group border border-zinc-200/90 rounded-2xl bg-white overflow-hidden shadow-xs hover:shadow-lg hover:border-teal-500/50 transition-all duration-300 flex flex-col md:flex-row"
-                                >
-                                  {/* Left/Top: High-Definition Widescreen Chalkboard Lecture Book Cover Slate */}
-                                  <div 
-                                    onClick={() => setSelectedBookForReader(sess)}
-                                    className={`relative w-full md:w-3/5 lg:w-2/3 min-h-[230px] sm:min-h-[250px] md:h-76 bg-gradient-to-br from-[#061f19] via-[#092d24] to-[#041a15] overflow-hidden cursor-pointer flex flex-col justify-between p-5 sm:p-6 pl-8 sm:pl-10 border-b md:border-b-0 md:border-r border-zinc-100 shrink-0 group/bookcover select-none ${theme.pageEdge}`}
-                                  >
-                                    {/* Left 3D Binder Spine & Ring Effect */}
-                                    <div className="absolute left-0 top-0 bottom-0 w-7 sm:w-8 bg-gradient-to-r from-black/60 via-black/30 to-transparent flex flex-col items-center justify-around py-4 z-20 border-r border-white/10 shadow-inner">
-                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                      <div className="w-3.5 h-0.5 bg-white/40 rounded-full shadow-2xs" />
-                                    </div>
-
-                                    {/* Subject Accent Vertical Stripe on Spine */}
-                                    <div className={`absolute left-7 sm:left-8 top-0 bottom-0 w-[3px] bg-gradient-to-b ${theme.gradientBar} opacity-80 z-20`} />
-
-                                    {/* Grid Texture & Radiant Glow */}
-                                    <div className="absolute inset-0 bg-[radial-gradient(#14b8a6_0.75px,transparent_0.75px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
-                                    <div 
-                                      className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-30 pointer-events-none opacity-40" 
-                                      style={{ background: theme.glowColor }}
-                                    />
-
-                                    {/* Top Banner inside Slate & Star Button */}
-                                    <div className="relative z-10 flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="px-2.5 py-1 rounded-lg bg-[#07242b]/95 text-[#c4f500] text-[9.5px] font-mono font-black uppercase backdrop-blur-xs border border-teal-500/40 shadow-xs flex items-center gap-1.5">
-                                          <span>üìñ</span>
-                                          <span>Book #{idx + 1} of {filteredBooks.length}</span>
-                                        </span>
-
-                                        {isYoutubeSess && (
-                                          <span className="text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-600/90 text-white flex items-center gap-1 font-mono shadow-xs border border-red-400/30">
-                                            <Youtube className="w-2.5 h-2.5" /> Video Lecture Sync
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      <button
-                                        type="button"
-                                        onClick={(e) => toggleStarBook(sess.sessionId || sess.id || `book_${sess.index || idx}`, e)}
-                                        className={`px-2 py-1 rounded-lg border text-xs font-mono font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs z-30 ${
-                                          starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`]
-                                            ? "bg-amber-400 text-slate-950 border-amber-500"
-                                            : "bg-black/40 hover:bg-black/60 text-white/80 hover:text-white border-white/20"
-                                        }`}
-                                        title={starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "Remove from Starred" : "Star / Bookmark this book"}
-                                      >
-                                        <Star className={`w-3.5 h-3.5 ${starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "fill-slate-950" : ""}`} />
-                                        <span className="text-[9px] font-sans font-bold hidden sm:inline">
-                                          {starredBookIds[sess.sessionId || sess.id || `book_${sess.index || idx}`] ? "Starred" : "Star"}
-                                        </span>
-                                      </button>
-                                    </div>
-
-                                    {/* Center Book Slate Info */}
-                                    <div className="relative z-10 my-auto space-y-2 py-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xl sm:text-2xl">{theme.icon}</span>
-                                        <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: theme.tagColor }}>
-                                          {bookSubject} ‚Ä¢ {sess.grade || grade || "Class 10"}
-                                        </span>
-                                      </div>
-
-                                      <h3 className="text-sm sm:text-base md:text-lg font-black text-white tracking-tight leading-snug line-clamp-2 drop-shadow-sm font-sans group-hover/bookcover:text-teal-200 transition-colors">
-                                        {sess.processedTitle}
-                                      </h3>
-
-                                      {topicsList.length > 0 && (
-                                        <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                                          {topicsList.map((tName: string, tIdx: number) => (
-                                            <span 
-                                              key={tIdx}
-                                              className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-white/10 text-teal-100/90 border border-white/10 max-w-[200px] truncate backdrop-blur-2xs"
-                                            >
-                                              ‚Ä¢ {tName}
-                                            </span>
-                                          ))}
-                                          {sess.topics && sess.topics.length > 3 && (
-                                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-teal-400/20 text-[#c4f500]">
-                                              +{sess.topics.length - 3} more
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Bottom slate meta */}
-                                    <div className="relative z-10 flex items-center justify-between text-[9.5px] font-mono text-teal-200/80 pt-2 border-t border-white/10">
-                                      <span className="flex items-center gap-1">
-                                        <Calendar className="w-3 h-3 text-teal-400" />
-                                        {sess.formattedDateTime}
-                                      </span>
-                                      <span className="text-teal-300 font-bold">
-                                        {topicCount} {topicCount === 1 ? "Section" : "Sections"} Formatted
-                                      </span>
-                                    </div>
-
-                                    {/* Hover overlay */}
-                                    <div className="absolute inset-0 bg-[#061f19]/70 opacity-0 group-hover/bookcover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px] z-30">
-                                      <span className="px-4 py-2 bg-white text-[#0a3641] rounded-xl shadow-lg text-xs font-black flex items-center gap-2 transform translate-y-1 group-hover/bookcover:translate-y-0 transition-transform cursor-pointer">
-                                        <BookOpen className="w-4 h-4 stroke-[2.5] text-teal-700" /> Open Quick Reader
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Right/Bottom: Topic Details, Subject & Direct Actions */}
-                                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4 bg-gradient-to-b from-white via-[#fcfdfe] to-zinc-50/50">
-                                    <div className="space-y-2.5">
-                                      {/* Subject & Lesson Badge */}
-                                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                                        <span className={`text-[9.5px] font-mono font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 ${theme.badgeBg}`}>
-                                          <span>{theme.icon}</span>
-                                          <span>{bookSubject}</span>
-                                        </span>
-
-                                        <span className="text-[9px] font-mono font-bold text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200 shadow-2xs">
-                                          Lesson #{sess.index}
-                                        </span>
-                                      </div>
-
-                                      {/* Title & Description */}
-                                      <h4 
-                                        onClick={() => setSelectedBookForReader(sess)}
-                                        className="text-sm font-black text-[#0a3641] tracking-tight leading-snug line-clamp-2 cursor-pointer hover:text-teal-700 transition-colors"
-                                      >
-                                        {sess.processedTitle}
-                                      </h4>
-
-                                      <p className="text-[11px] text-zinc-500 line-clamp-3 font-sans leading-relaxed">
-                                        Interactive revision handbook equipped with AI flashcards, dynamic mind maps, chalkboard derivations, and structured chapter summaries.
-                                      </p>
-
-                                      {/* Metadata Badges */}
-                                      <div className="space-y-1 pt-1">
-                                        <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-zinc-500">
-                                          <Calendar className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                                          <span>Saved: {sess.formattedDateTime}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-teal-700 font-bold">
-                                          <Layers className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                                          <span>{topicCount} Study Chapter Modules</span>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Action Buttons: Dual Quick Read & Smart Revision */}
-                                    <div className="pt-3.5 border-t border-zinc-150 flex items-stretch sm:items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedBookForReader(sess)}
-                                        className="py-2.5 px-3.5 bg-white hover:bg-teal-50 text-teal-900 border border-teal-200 rounded-xl text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98]"
-                                        title="Open In-App Textbook & Formula Reader"
-                                      >
-                                        <BookOpen className="w-4 h-4 text-teal-700" />
-                                        <span>Quick Read</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const cachedDeck = localStorage.getItem(`revision_deck_${sess.sessionId || sess.index}`);
-                                          if (cachedDeck) {
-                                            try {
-                                              const parsed = JSON.parse(cachedDeck);
-                                              const hasValidMindMap = parsed && parsed.mindMap && Array.isArray(parsed.mindMap.nodes) && parsed.mindMap.nodes.length > 0;
-                                              if (hasValidMindMap) {
-                                                handleOpenRevisionDeck(sess, parsed);
-                                                return;
-                                              }
-                                            } catch (_) {}
-                                          }
-                                          handleGenerateRevisionDeck(sess);
-                                        }}
-                                        disabled={!hasContent}
-                                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
-                                          hasContent
-                                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white active:scale-[0.98] shadow-amber-500/20 ring-1 ring-amber-400/40"
-                                            : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
-                                        }`}
-                                        title={hasContent ? "Generate AI Flashcards & Mind Map for this lecture session" : "This session's board notes are empty"}
-                                      >
-                                        <Sparkles className="w-4 h-4 stroke-[2.5] text-amber-200 animate-pulse" />
-                                        <span>Smart Revision Deck</span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Quick Jump Slide Dots */}
-                          {filteredBooks.length > 1 && (
-                            <div className="flex items-center justify-center gap-1.5 pt-1 overflow-x-auto scrollbar-none">
-                              {filteredBooks.map((_, dotIdx) => (
-                                <button
-                                  key={dotIdx}
-                                  type="button"
-                                  onClick={() => {
-                                    if (booksScrollContainerRef.current) {
-                                      const w = booksScrollContainerRef.current.clientWidth;
-                                      booksScrollContainerRef.current.scrollTo({ left: dotIdx * w, behavior: "smooth" });
-                                      setCurrentBookHorizontalIndex(dotIdx);
-                                    }
-                                  }}
-                                  className={`transition-all rounded-full cursor-pointer ${
-                                    dotIdx === currentBookHorizontalIndex
-                                      ? "w-7 h-2 bg-[#0a3641]"
-                                      : "w-2 h-2 bg-zinc-300 hover:bg-zinc-400"
-                                  }`}
-                                  title={`Jump to Book ${dotIdx + 1}`}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="border border-dashed border-zinc-200 rounded-2xl p-8 bg-zinc-50/50 text-center select-none space-y-2">
-                      <p className="text-xs font-black text-zinc-500">Archive Locker Empty</p>
-                      <p className="text-[10px] text-zinc-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                        Once you conduct or complete live classrooms with Cherry Ma'am, your completed board-books will compile and archive here automatically under secure token sync.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
+            )}
           </div>
         )}
       </div>
@@ -9752,89 +9839,33 @@ export const StudentAccountHub: React.FC<StudentAccountHubProps> = ({
             strengths: dashboardStats.strengths || [],
             growths: dashboardStats.growths || [],
             recentQuizAccuracy: quizAttempts && quizAttempts.length > 0
-              ? Math.round(quizAttempts.reduce((acc, q) => acc + (q.accuracy || 0), 0) / quizAttempts.length)
-              : 85,
-            studyStreakDays: Math.max(1, (pastSessions?.length || 1) + 2),
-            retentionCriticalCount: retentionEngineData?.criticalCount || 0,
-            retentionMasteredCount: retentionEngineData?.masteredCount || 0,
-          }}
-          onDiscussWithCherry={onDiscussWithCherry}
-        />
-
-        {/* Phase 5: Kiara AI Live Voice Strategy & Counselor Modal */}
-        <KiaraLiveVoiceModal
-          isOpen={isKiaraVoiceModalOpen}
-          onClose={() => setIsKiaraVoiceModalOpen(false)}
-          studentName={studentName || "Scholar"}
-          grade={grade || "Class 10"}
-          board={board || "CBSE"}
-          subject={subject || "Mathematics"}
-          lowestMetric={lowestMetric || { name: "Accuracy", score: 65, icon: "üéØ" }}
-          performanceData={{
-            conceptClarity: dashboardStats.conceptClarity,
-            theoreticalCore: dashboardStats.theoreticalCore,
-            calculationPrecision: dashboardStats.calculationPrecision,
-            formulaRecall: dashboardStats.formulaRecall,
-            socraticStamina: dashboardStats.socraticStamina,
-            strengths: dashboardStats.strengths || [],
-            growths: dashboardStats.growths || [],
-            totalQuizzes: quizAttempts?.length || 0,
-            classesCompleted: pastSessions?.length || 0,
-            snapshotsSaved: snapshots?.length || 0,
-            lowestMetric: lowestMetric,
-          }}
-        />
-
-        {/* Smart Revision Deck Interactive Overlay Modal */}
-        {activeRevisionSession && (
-          <div className="fixed inset-0 bg-[#06181b]/95 flex items-center justify-center z-50 p-0 md:p-4 animate-fade-in select-none">
-            {loadingRevision ? (
-              <div className="bg-[#0b282d] border-2 border-teal-500/30 rounded-3xl p-10 max-w-md w-full text-center shadow-2xl space-y-6 flex flex-col items-center mx-4">
-                <div className="relative">
-                  <div className="w-16 h-16 rounded-full border-4 border-teal-500/20 border-t-teal-400 animate-spin" />
-                  <Sparkles className="w-6 h-6 text-amber-400 absolute inset-0 m-auto animate-pulse" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="text-xs font-mono tracking-widest font-black uppercase text-amber-400">
-                    Cherry's Revision Lab
-                  </h3>
-                  <h4 className="text-base font-extrabold text-white">
-                    Synthesizing Study Materials...
-                  </h4>
-                  <div className="text-left bg-[#05171a] border border-teal-950 p-4 rounded-xl space-y-2 text-[11px] font-mono text-teal-300">
-                    <p className="flex items-center gap-2">
-                      <span className="text-teal-400">‚úì</span> Reading classroom board-book
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <span className="text-teal-400">‚úì</span> Analyzing scientific formulas
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <span className="text-teal-400">‚úì</span> Generating visual concept map
-                    </p>
-                    <p className="flxúÏ=€nGñÔÛ&Î°2!ERí≠0ñY∂cc,Gï`fn6ãdèõ›ùÓ¶(Ö#`üÊi±≥ò Û∞òÖ≥,&˚4ªXÃ˜¯&ü∞ÁTUﬂ´ª™) v<n¿2ŸÏÆÀ©sNù{—sbÖt¥LÍÑ‘'√kı˚?#“Îv‡1m#û3∫◊Èyÿ2fCÍ∑∂;b8÷ÃiÀõ€mÏøz˘?∑7Òï}rËŒ<À∂ú	√€S”Gƒß¶a€dDÕ“˛noz≤Å‹ﬁYg“º¬–Œ¬˛©a∑∫ùŒÊÕ±©1ÇÅ¥|jÁtD∆Æ∂√	»Ã8o-ùŸyÀòán	ß‘˜/»ëÒscF¨Äx>ıÁfŒÉ–Ö{J√≠3öL7 ËåàÈ:&ı¬πaìôﬂgÜCt…î⁄πpÁp#¿uß–p@É¿rùü„ûem)4$@íÇHrsÉÙaŒ,ÏÂ,√=#4»“Ãø	/¶A;ú¥û~8ﬁcÛ∫˛ñøCf£>ˇ›
-lƒÖ@}ó˝ÍªsgDG≠≠sõ,Z„9¨=á¯-∏17F˝iÎÈß€g”g :zŒ˛¥L◊&Óı«∂ªhM≠—à:$ò#¯÷Éwq%∞Cñ—
-a6-¿,…Ún,7?&!`‘ÓòúXêCNo^ﬂh67»ﬁ>YJV7I‡Œ}ìﬁ5FJˆ»ÑÜÉ‰∆#gÏ69jDù¯*o|&i–ß·‹w
-R∫,p∆ﬁ
-›ñO∆æ;ÉïÍåz£ûÒåúY|Îv∑å≠[œ •'≥G{…"£tlèZª∞xΩß°≈8ÒŒ[€ƒªhıH0Î√óõÏˇã÷V{á/XÜù¸¬_¥Ü4\P∂h@'/ZùrìõÎŸ¶cÄ™gò¥u—Í"· “t8jtKõ*6Vcwº°ÖoxmIò¿;a}l†„?›_üÓ∂wºÛgú√m√|Åjæ@Ó≥∞FpeÓy‘7çÄ"L; C ièDî2%hTéê_˛˘{28:89%'˜ø~4xÙ≈ì™…pæ\ÒD≈OH4á0'ò#·∏M8∂ÀË%¿ I$–]>Á ¸4¬ôÎ∏òÆ=b†Bàq¿•`&ÿê|πªlTÚ—2EÆÌ·‰Gp˘ºjÑÑVh√”o¬jöæÂ!Ô©z∑zÑˆ3ÌZ¿S.’´%}◊6Ü‘÷x9z¢Ú+W'Ÿw∑ê<¸πcqêà{œ˙ñÚ U`ıR +€¡|¯jÜ‰∑ø%‚„%yıOˇIÿÍë%≤AZâä
-òî ‚ÁÈñL‘ÄIq60√}å}"igË_¿!ñ5‡%˛ﬁ˜Ì¸v Ÿeà<ﬂ5·#ù"≤ñ„ˆÊt´îWÅAìÉWP·¨œ˘o¥+êô]!|ræsœ]8∂kå» úè.»1ıâ“†í˘‹Œ√–u*†Ë:á∂eæÿ[NAL≥È˝sœıC÷vQÖKŸÅÌíõ›ô¢¿“èÔ¿.öïé‚€))Öøó›q£ÕV∞ªnä›EòÚ¥€AJåP+Oî≈˝ßîEFKÉee*q˝¿ı[ûÀÑ‹àìBw˚»Ù∏6* ∆Ÿg#^ #√≠8≈5]X·ÜÔœÊ d.@£(]ﬁx%õã;L-ŸÇI.S¸€ õµˆ¡ Äh#V∆±Üè]Õb8NV∞]ƒ˜c çêlíÅÚ-¿‡¯ﬁÉua:óc9æG†9•‰»öo4nl\;⁄3˛÷˚ª¬zæ†ÆœWó3÷:SJ√qõ5Cª.‘fÌo¬p◊Ñ◊É«$èa'!XlYÄÂ'¥5°ËÄwY3◊ÅÏüã.NR™oâRVE#+0Ü6Ì-ër Ω¢óﬂìMM≤âAŸwAÀ≥¬îy‘§ÿ Ÿçh}◊ùmé\s>É!áÌ"∏o¯)ÃBã”ädvB«>¶áãå™í¢4P(rÿ@ÓêFd<Àiê>i4@≈Xç&Sí3“–»QPQïfñìém7»PœZ0>ç∆¥eñ°j‘‚≠˘n»Õa•ÒY©b´É•ÿÃé|ouL˘Uñozl„‚-ZLÚù∂™ôr≤neøóäÊ•?ILLóM‡qR≥ÿ£îSfæ;Ï»`>Õ∆r‚⁄V+¥‡≥xXÿuá>5∏X∑öçM˜
- ;ÌîM¿ßœdñ3ﬁFaCÏ·∂MùI8-ö€^ÈË.Ñ∑æ`öe˚Ã∞Á4h∆øb[Ì±e√◊Ê]◊µ©·l(ü¬kÚÜqp'Ä≠Œ$i÷Gÿ¿üΩ=“¿7ÍftdÕg´u¡ﬂ’ËÑ¡≈j]‡õx&6Õ◊mütÄy·¥ÕXA≥ô]°M˛‹˘òt;4fw>ì±π∫VTa∆Ît6ak õF˘èª¿VbS(◊eô14k≥˘â}ˆ›Eµ]˜œ≠DNq¬Ä⁄ ‰ñ„VòJò<$CÚƒ8≥&åıUHN˙:zlçá,Ä	GwÇ– •gUŒ÷ΩRl/<\
-ˆX◊Œâw2b‹©1l6v°´—,ü√bnI§ßDL N‹‡ï›† aZ*}$cÜ…e‰ß∆	+5Ω ◊	
-"U6k1êŸ(-r≠€©TmÍìÑtvπœ'’~bŸà∫≈*à∞2'<[’ïΩV)cÌˇ¯Ú_˛W√H xêl=Õ%„>óÎ¡^E†ÎqfxÔ$9Ds”¢¶HΩ'íê¬üø◊%ÖCÓ &h2ÇM⁄˚ÈëA0üÕˇ‚ù$ÉhnZd +hM‹˜ÑÄWDﬂ˝Qó‘‰∆⁄øØôæô[ﬂæìD¿&¶EQ¿√{ )±Ë/∫$p¬U˛cf/0©>	î˝Œ,ÍŒós¿jÿuPL&n∞∏ﬂµ´‹Åz⁄œVA£)hmKtã:#R∞•Vπ2’¬<πq£De≠3ç**kEÍÿˇ÷rÃÑûvªﬁ˘≥∆æ w_+!7∫E´'Ã_[=í¶à¨ïo⁄Í"ΩJ0ü±≈Ï¯8è‰Mîí ™à=Ï H‹DlúJmì±Òq'7=≥ $/0≤dI÷(úˆ…Ûèñû^˛√srYíB™≠… êˆHr—9Õ1B>Bù0ì »ÏêÒ´∫ã:ë´Eâq Õõ_∫[8ør¯¡t> $Í®
-;2HŒºD∏Ög)±∏ëÑHc"‰∂'•T9úD§Pâ)∑ÒÁ9’∞‰÷{Ú@€$¢ZLXŒ®—¨gΩ=
-Ø™x_√è√{–a´ÍΩ3~Óu†·	âRlÔ1êπ$ ¬ëpA|n_ ¸éÎFC6ˆu"·Ì qU(ï;≈ı{æéÀ!∏;∞ W'$_[t¡"{dB•lo|ä•ò.<&~–)<ÓÙ
-ÉåM]∫ôIn·òOÓínü<x|0xxxproP" _iÃOï+¶„˘y‚DnRïÆåÊû∂ûnÔ≤ê§≈ÌrGGÖ”ê_Îp¶[“u ÚÀì¶x`⁄Ÿ®®¬+]Uﬁ))√KK‘ò·µv9‡œä˜I‰©¿“( ~K-X<√a” ÀëvÅ#ÌÊ≈≈(üFÕ®≤9<9˘ìq¸∆˛7µ¡ Uñ,Ék\í1TﬁÅPŸ˚ôúûÖ®Gã§3xñ£c∫3œ¶ƒÎ˙î ¿ïîù+%pi
-ø*dcÅÚsﬂáFÁtÑÆO≈ΩXè +Ä∆ Ò˘Ô%˙≥∑XÉIÛmkÑMBLyjJ˚®òo◊
-éÑ'⁄˛‡Éåk˝)ÔT=6ﬁ3˜9ã9¥nˆkÛ$ùcˆ˘t
-™^È§Jõ”†Â¢BÃ8fß¨ÊÖ¸b©∏ÊÉ–ÁŸ$Ã5oﬂ5‰˘K∫c™d⁄≈∞±,_AÒNÕAÍf¨eGéÿ91Å/€V.˛±–‡¶àûÁ∫ 9ó“µ'ø ›KÃ>?•x§#DiX.Ænﬂ¡kô%•ä+˙œ-≥¸ˆ$È6Èê¬d	ìÃ&ÖÌ6∫rÙ«å‰,¥qvUtc´∞Fø†yîÙWÌ\ƒƒdºÊqÁIº~∂k~øF«ÿ∂Ô©¨1ˆ≠ÿ2ª≠0¯F◊ÂÛK5V‡≈Á€œaàZì”EÒJ)?∫‘∫ã¶*[Wô-∏GBw2±)Ú°”6˘F¢1âúè$„IòSucôjö≤∂•Lì¨R[≠÷ÛÖ0IéJŸ∑9ì’m=Ì˘4£ﬂo'-' {^·◊D\·I|)¯¿ƒ1>Å†›e·∫x;sS›ÅﬁÜ]€œ N6í8;∂1à•yl¸U3™8ÓôgÊ'üür2_]z◊6Oiò£+Ω@¸B˘gÎËñ«˜oTŸA}/IﬁŒ4è˚´bîE˜È£ ñ∞Sèéö®ô¯Î¯A…*ä‚ñ–Ä∑zQP~t„&ª!Q˘`ŒJ‚3,ÁÕD#‹b!œŸ5Mn{àÑºJãX>¬∫òåüw„L`^&û±R*¬ïøkò/&lnò
-‰L–uÍ˜‘öLm¯'∑ÿd/<»,õ1\{Í_+t=tkµ|Ï
-?-Z71–˛dºZC{Ó3ÿGÈ¿RX[ÙX}¿ R€Ë{ãÜ1 ]€ı˚B≥i°Ôæ†Zæ#p3’4·Z)ø ¢`cÃñ‹5ÏÎúµr÷£+g›Œk(2A9üpì»Ãπ‘õ8Bg˚”¿ã!Êáﬂù|zp·ˆ)¶ı+1/=sô∂`ÓÛƒı/ò"uü8¡õçC¥©àÿ2çmV_-MbO	VEUVK`íVa_¿√à»Å,`7… Ÿ7€__˝˚w‰À9Bû˘vÏªCõŒ÷:cù¥
-.ù
-∏pvﬁJâgâxòbcøÇ2…VèOXVœÍÆè8`∑r¬¨”ñ2Z1Å°û?D“1ΩÎé.V‡†ëë¯ v⁄®´c¯@ä†ZvÄ‹("± 4Uˆ~R! ?˝(™óíÂåæ˘¢Mö]CÁò=rBÅ˚òÀ˝9{ñ4ˆ·nû}Q&gI<“ı[√ÎÜ¶ò≠%ÁFW}n*2„u-:l<π’‡Œ?ÿ\†ç¥°ÌVﬁ ¡~πïï'QúåÂ*~àJ	ˇõòÖyc⁄®∑Ñ⁄ãRkY™‚R“WfDSLÚÜe	¶Ó"¶ªá‚Ê™kï6C·*»LOª≈Vôb–ΩhmäÊ[Vg)JUÉòkUc°~|˘áˇ V"ß3Ÿ«πb†ˇVéŒ>«`Pk°÷÷&ì]â9&Ω
-õ˙âò$„ò…‹Ì*Ÿ≠ì)¢‡òÁâócê#ﬁ£†d€∞ÖB§…∑Û©∏Æ]õU÷'∂Ù‚¡’9!´j◊ŸÈö]˙¨ƒô¿h)üL'„◊âˇTFnSœ∫EJµÖŸE´_“"¿RÉàÿ`‘¯ëÄ¸-b∫°ÒÇ„"@48}„¢mÏˇ¶Ù±|N˙ãÙ≥‘´°T˘]ÿP#g≠íRwô"ñQ‘ı†UbX,√+¨ocÃ»i§öX%_™ˆÃöÕ∞:+˙ì?!÷ËºOú9éÜŸ‹taOPso	≠\ñÿ x∫™Nº®§©¶Qdcˇ’üæ”WGsÕÓ/Cm+kÍ’zã∞°µI÷lx≠Ø⁄∑ZK’z‡∫!Sæ#Á'aRòFö@‹aû®≈û ±OÖ@«∫fÆ§Ëdbe¶à¥ÑÆwÏªû¡πõﬁº◊Ê#h8»µ5M‡xÈYa¶$54Ë≈r™'©eCxåFﬁ·‹ÆVc)nG‘i,(wH„!∞YÜüÃBÙÑ¢'ä}M˝·∆*Nµa@b–XKP~2uÕP3÷[Àäë[<+I+]%É6·UóîíV§¬·"ª˛ÊO¢¢∫Ã∫ƒˆ«p•0éÆf7w;ÈÄÉ^i¿A⁄ç]V.
-•à+P„•ªè˝¯ÚÂëá»ﬁõ›M›Bœ-)û~[∞ ™Àru<ÜÉ"ƒ6ÉºÖ†$™ÂÌƒÖ»Éiˆﬁil‡%tÆéq(URUø≥!VEåHÖXΩù8Òﬂ‰>@ã4∑÷èkñd5QÜ@ƒ[8πÎÜxA™–µÇÚLY|5¬=Ø7!Iïê\•/èÚ‹W≈Ï'ó<dlÿ≠à~ŒµP§k6p(õF,ç≥ˇ[§´’ûö≠h¯Ñìíòr ≥¥à∫âb¬Ω†J+‘ê‹ ““,UPïl¨U≥ &çJ<Ê∏!ﬁwt§Ô’◊ê¯ßÙÃwù«h¬/‘O€?∆§wÆ,c!ﬁ—’4^ıØ#>+è};1ˆÂï—¯V‚Óäº4∞çE|¨äVIQäàÒ“…5î˚€kÈπq|°,*Ÿ^˚¿T›zF;äîh– ™≠Ôæ]8xµË∂»8CÆ˝ÆÌDøx€v¢‘Ôw§kÿëÈ>ÅÈh[≠ƒv¬7W⁄ƒtÛíı§Í_“ã°ãBu0u˝–úá;ßK7∂∏Ü%kßt=ôp≠î‚–~ıœ?¸ÌØø'Éh∏ö¶/˛r‰π˙ÍwˇJ6…´ﬂ˝·Y‚ø˙ÑnçÇlÉåùCì˜qV©Fh«aÂ|òjô’Jçt7{õ[©ÜN4ßßT€TuN x œHØ’¢‹MÂÉ˜˙‰ã'á˜èO…—£'˜»—¡qÕ¨®ò¢~JxÊ`∑õÁIJ∏:lå•ﬁãbÇ‰‘uÌa•Ê∫Rjt⁄”ä—ÍW™◊[«·_˚,≤:uıs)X÷Î2¿ aÓ†#1ÈKKEi]7¬Ü”l(dïÖ+üëXû
-Zùm•Ãüö•«…A0]<8˜f¥≠«ë È∞ëëõì™ìû™°Xù›TÕªxí3y8VÚ/ı&˙zÉAÊ-∆>æü.Z∞rœÂ±ÚKç*πä’)ßÜoN…ÚÄïàØ>ﬁEìgñÍ£NuP\æÉ8wI‘pa-nÔ™JËâ9…’Â‹¢∆…C»êî%i®’∑-«õá
-‹‰4á]™$xV∂o!3õÇJ:ùŒÑäHÖù≤◊õ¥˛Ñä3î¶œë`
-{ı˜ya–n∑U3(Jb*”õR¸¿≥[ª†õ¶è …D\â√Hía¶§u◊ú}w≤iñΩ≈o•â|õ=(éÆûNıY0JÖÂZ˘q…a¡ŸDü'7“ec#.ô—õ£¯rôä,/Ôp3oVsÆ]]∂˘”Í_ã©Uo*®˘já—E⁄Fß¢ÜÅÏM`êÁ\ÉD—Íâ{∫X$3xÙ–öL['4 «O>„xc®ÉGÂO®∑ÈhO‹ ÊsﬂëMrÍ”™£ÖuãÇ9¨MYQ0±ﬁiÛGÖ¡–xÀåÇÑµæ‘&$+kâ˝W@À83,≠ÖxgÊP˙ˆõ-w≈¢£'bQ3bL;Ù≠Y≥ Òáœ/:ß®ÈÙâ·\04R@©È¥!≥4à∆F;tªÍmn¥÷ˆ|ÑáEe«ì~h^Uwb∫>yg#7⁄Å;£Õ¶≈J≥·ö´å†:&¢Í◊>‹zKaMêŒÒa.w'_{ƒû§ænÈ’≈  2«ë≥u.ô´TæÍra–ö“±¡[Ê√G∏£6‚YUy1~i1º¥j^ì$P^„Ÿ“≤ 9S¶E¨Ô‰Y÷NRs∞xÄd¥µ⁄¢µ§ŒƒöÇzØ£FAO?‚uçï
-X{∏Ék>õ”üX:u∂jÖŒ±âŸkmı(¢K?µh∫≠*g§Fg∞◊»˝X"Ö&åˇyî|lŸ∂Å&# #V#N´ÚÊt{Ìƒu"®•’ıvyu=Ië∑íÍz7ı≥ëêìPöS◊.Ì†ù;»órïîAy¬‡v◊ÏéÀ†ôT‹^db(œ\-OZÓq¸T‘ºñTÂÀ"A!e∞_+±®$c0Íı'ÕÎ•	ñ%ÈˆÆî_∑å6s.] €˛Ñè@®ì∂ñ§¨·´ó“çV‰tó¥
-ÈﬁÏ< (Ö∞N≤†˜êÊ2∞-m–®];ìMäølEzµ2Kqëç[≠ë∞Z3ΩÆN ‹:sÊ¥SH®óïzk\⁄[}rˇW˜ø:}Ùı}2¯ÍËË‡‰◊5}⁄—…h+˙¥∑%>ÌryO◊8!%5ODøÅ‡±ºT,ès†˜¢Fë«IªzeœEAçt#‚÷`Ji®Y;›Ú“–scvä∑ƒÀÎ‘ ’¡/D£/@ë8≥ËÇÁá÷ç‰Y¡(s3—pÖFÎ‡"ÁW.O≤*í¨<±[Õb‰’ﬁÎNá≠A≠ÍJı‡K˚ÈçdÖí%€IÑ’nÑMÄ’YÜ3Ü24Hwv◊eÁÛÛ$xQ°ôÁ”)u˜åS &nÎiÑSÍ1X¶aì1`ÃÀ	; ¡Öø÷∑tƒŒß¬™Ù¢é®Ô¬W[ÃC◊<íP´«”QPéL8éäƒñ´ñ]xc¥Yì:≥æ¿ı'ù4_Zæô?®HüBc≈|«tdL‹	CΩT¡áZuÁÍ¬PedAWZ‡XÆªºDya	›πÇL“zΩºˇπ∂¸[]ü"¡∂∆˛á±&^ORóüvsır^uƒÚ:mMRC ◊€á‘©¥Vñ—'¨@ÿFH∏‘•d§ëÿˆéÚ—‘1≈◊«IOYÀUô®d˘~:‹3F#∆<«%>ì5pNVoÀËé¥Õg[âa£FÌûíh¸nYq-nÃ∑xöô{£’L€yÎYd#»F≠T5LŒK«qaH¸¯z+¢	®tûm8<Õ∏Fô¨Ú¸nÆÃ˘≠≥’ºf∂¸Ovõ‡πP´æAé≠plÿ5çñ®ôø£{´ZrΩ;ƒÅM˝‘∑gruiõE˝⁄¢0™ÙZÇvcèóÙö˜éÿ Æ)]#˙p¡⁄ÚÆU¥éN∆¡XjIuöO≥ÂJŸ:+YG5oÆ(Yg±çK÷Ø˛Ì˚ø˝ı˜oâTmy_rı Ôø>ˆvüú?∫GNÓ<~Læ¸Í—?÷4a3∑æ]’~ΩU/'Î5û∏…≤¢SÁlæ[ÅuûèãiRŒôdëu¬¯∆"ÎÆ`wWÖc≠ò´∑]Ã’[˘XB«n≠,∫øêFù¢ÃP{‹bv∏:È®ß®áôogtÜc&l*Óà¿aù1°7H◊W÷ítLµe´©VóúNô`ÆSW<c4{≤®NT]ΩÛDïçiGÿi«ÿ’ã≤À&±…à§4v.9ßy:\Ê|8Ã_+î˜bëô„7ª"u-G∞zqbz!RÎäüìÜÔ]QË+©oñ;èM_vãOÅ˘∞^tTù¯(ˆt≠:v´U≤[Ôëä¸“HÏ¨Zóı$}¶ØÑdjºDrÁòÓ§NV,eö~Lˆx’À)]È|E~È«:÷à≥Ãr£W˙é|Ö:M∫nˆ$∆‘m}j©Uı±∆ieæg˘˘Â∫√-©¬ü:∞&{LÕıú¥p{ƒŒz≤∂fwÓ’‡¢"Ä•íëf=U)¥åOî…ß]%'	¶ Õ8√Uéõä∆ÃÍ©¸Òˇà(Mu?mÍLŒU®≈7 Vµ
-`ôEy»"—çºU∞ñÃ∞—z 1∫2¸åœIü¢èúxA+´Í![ãr'‹ ZEvr›à¬1I¿lTI¶2+ùö¡˙™YÂˇä¸√£ú‘«V=¶îÔ´£5˙y√VÈ√íõx‹ê3∑3ÀÁãáì∫Ñy\Ç~Cœ=◊Aos;Ej>Ã;0M ˘·|¯Ÿœ˛  ˇˇ k f
+              ? Math.round(quizAttempts.reduce((acc, q) => acc + (q.accuracy || 0), 0) / quizAttemptsxúÏ=]s€»ëÔ˘≥ÃﬁÜJLä§>¨ÂZr…≤ΩV‚≠®›KŒÂäApH" %qU›SûÆí´lUÆrµπ´∫JÓ)wuïﬂ„?ê˝	◊=3¯` ( ˆ:ã™]ã¿|ˆt˜t˜t˜¥mÍL¬È∆˜àÙÙ…ﬁŒ-È]ŒGãAËS„’}cÙ…#ú∂g∆e≥{ã4=#4,◊	Ó∂yõ‰Wø"›Ú#“€êõÚiHùä˘VhôÜ}‰Œù∞üº‡L,áﬁ7B„n€Ló¡&;ç=Å!Püé õ•À‰ª∫J˝pù˚V`ŒÉ‡≠pz4•æøÿ_*^&u6æˇΩ‹¸!9ô%;}ÚÀrxL[Áî|·Z&% I#§ì˘à‡`jª>y‚éõ¸p3iÛ´ãıX5V 5H+xÊQgi¨\R_À≥9≤›ÄÓ/õdˇÄ4<VUié;†Èö∏Ó »ß∆jß~ ÙsÍ⁄ÜﬂHWò¯∆ä≤X°#€“ÌH•ÜÆ·èˆóÏ^Íﬁ‡ÅT"òAÕ:Â∞Ràttf FRa€Ω†A¯ÑÜæeÓ/”ø∞⁄í80‚>iöÊ‹7ÃE„	L◊áWª;∑àe∫|¸ÊÎﬂ¸•!#ÅG˝±Îœ«d¥ø\J∏ıLÍÖ0A@“Eüåå` f4ç0hÀüe¥Öi@ˇ≥q ô∫ôÔrexiŒm±˚ƒß¶ÖdóÔ]QHnß%N)µsı•Ø^‡ö>ÆúYéë´ö˘ûe$>cAæZÙ◊Ï˘π⁄ƒw/Tïƒ{Uï–˚≥πıÂóÍ˝˛8C:ÛBâEe¯ââÿJÉ#wÊŸ¿BF}Rƒ€2«Ç©„´≈øKÍ§µ/˝*‡Kj≥’'è¨…¥u‰„ê;≠Cœ#èg4t›W»a¶Ü˝äì⁄)≤Tröcj›É
+ºH´˘‡‡U@étÑe∫>/.”∂˚
+»∂™Xû'TUöŒ‹∂7‰ä8îSzŒp˙>5°∑&¨Y¿⁄…ëh¡òS:¬íd¿=]ﬂò–ˆ8!‡DÛ•/ö˚˘J˝¸√%∂◊¯≤3≈ﬁXŒà^^Ω‹¯DÍ≈ìf“«FfÄâ˛"˜.õg¯¡∏~<xˆ¥Õ~•€˙§†,¸Ümçû¿àû‘}Ùë¯´=ü‡Õ°Ôã∂∞õÚ˜∂„é(¿.Wëà∞˜ÄtÚc¡âgFíü=>S¿Fõf◊ç≠⁄-—≠b™l{ü˚N˛ÀUÊÕ¨qhNIÛÁ–ø¸Q˛≈Ú)u(n¿π¡HÉX≥@0ò~H¢.	C«c√Q2xvN}€X(às…KDU7¬k¶Fxgdùs˛≈vÎ∆ÿ∫|∞@∏[2ú¥ûø≥€›Î_l~ºC∆6Ω$‡~–2)éÇ¸bÑ÷x˝¸≤µ”!‘úç˙^kõé;/mçÅ*[ñC8Å∑◊°ç	∆∞#ÀôƒSΩ+çS5V>∫aoØ7zƒ¬oı¢?Bjÿ0òŒÊVá¯ -çË®µui√‡∫0:„≤u—öç»EkúÇÑÙ2å¶Lçë{—ÍAŸ¿3L⁄Z¥v˘ƒÒ-”µeÃ.[€ôπ®ÎS‹Wœ≥”Væhuw…ˇùSLm;7«^'~≈_nw:1ÏœràXä~@FØl»ùcﬂª(∆là=bs√¿µÁ!çëc÷2Ê°w„ÕATˆsg¶W°⁄[jM∑“ÖŸ‡.êGú∞5s¯•aæj]X¿ÅB˛eh√K2˜@(3q◊ìÁ§ÏàNì?≤{lUC⁄ún©á∫ùÍ{gCÇ_æ1tÌÃ≈∞©` ÉÖ2]`}	”Èî)‘†®oÅƒ›n∑’C⁄÷A0÷µMaÁÁD¥”Ω›5""í–ÎcF–€1"¶»¢«gº€ı._§Wﬂ≤ [Ö0æ„I\'«W&Ü◊Í‘Ö⁄0'7üÛØˇ’ùM,s¿Ñ+ÏªÓå´-8‘#€ÙﬁÚê√^∞5L“1®$B¥ﬁ—1ãÕ43áΩHh2¿kΩ∑?Êìÿ’¡ÎØˇ'öäÔñç3CÌ©â¢Øœ4ÇÚ]ùIpºÏ‹"&ñÄµÃ|∑Clé¥-‹4p?f¥N v.®€≤ﬂR‹‚∆ƒp‚˘8=£ÿ∞Å¨îO7 Ëå¢Ö√5D°ÜËí)µ=≤pÁÑ[D@ÖÜÖ¥˚,·ÅÜ≠fJ
+ )A§xπA–.ìH\®SÎ „Ω±16cŸÄI%2ãlƒÖ@}è}MK
+B6‡ø/¶‚≈®?m=ˇx˚|˙"#∏ åçA#kM≠—à:iQ"⁄˛qõr5Ï`ñb˘r/P|ƒU0wúÏIGú“"_\£ŸT®5¸·ö@‡Œ}ìﬁ3F
+Z (4É‰≈±3võJ·±D⁄Œ-H·≤†ëπZ+t[>˚Ó7†Qo‘ÉË‹2‡W∑ªel›~(ÖüÃÌ%ã8å˛†3@`{‘⁄„ÚO≤ô$2‚·˛Ã˙có˝ÇEªLÇ“Ç≤E:y’*⁄∏ ˆ“hcÏ"· “t8jtõR»ﬂjv«∫Ø§-Ûx'¨èîc<ÓÍ|ÛﬁkÔƒª7óñ≤ÇT"=; C i/ñ@àé—<(!ﬂ|˝ß?í¡ì√”3r˙‡ã„¡Ò≥ßeì·|π§D…'$ö#òÃëp‹&€UÙí`È$Ë._r~ú!Ä80QƒCP!ƒ8‡R0lHΩ‹](õ ï|∏Lëk{8a∆—´óeÛ $¥B≠Ø©ö∞ö¶oy»{ ÍñØ!É–Å‘.⁄BØ™WKY◊6Ü‘÷®ï®É¸ï´#	™Ä˜s«‚ ˜ûı-‰Å"È<z‘äv;eÇ^ë◊ˇ¸üÑõ∂π≠ª+`R(càœj}	&≈Ÿ¿˜±åj—øÄC,k@•XcÜZ‚ΩùÇﬂN1ª,ëÁª&¸IGgà¨≈¿(R¥*¡†…¡K®p÷Á¸7⁄»Ã.>9ﬂπÔ^8hÕ*€	ı©Çñ]∆|ÓÁaË:%PD„ßÖÜKnèzpÈπ~»˙¿. pIﬁÿ.πŸÌê)
+,˝¯MlEà∂ÿ¯uJÜFJ·ı‰7⁄lªÎ¶ÿ]Ñ)œª§ƒ%ÌΩhˇ)dë—“`G≤L"Æ∏~Às≠¥A∫„Xÿ@¶«-∞Q1Œ>ÒR>1¸W–äì_”+ú∆⁄†Qî.nºîÕ≈Jî\¶¯ˇ;N\=À+¢çX«>ˆj√q≤ÑÌ≤ çêl<ƒ  Éì˚◊ÖÈ\éÂ¯ÅFÿåõo4nl‹8⁄3˛÷˚ª¬zæ†ÆœWó3÷:SJ√qõ5Cª)‘fÌo¬p◊Ñ◊ÉÖcí«∞Çôœ7≠â8	 ˜X37ÅÏ √µRVF#+0Ü6ÌgÕÎﬂëMM≤âAŸwAÀ≥¬ <’§ÿ Ÿçb+‰Ê»5Á3"qÿ.Ç˚Üü¬,¥8≠HfßtÏ”`zt!©*)JÖ"ÿ“êè˙§— c5öLIŒHCk GAEeöYF:bÁƒiÍY∆ß—XB[~åTäZº5ﬂôﬁ!£πœ<-òH[™QäÕL>\S~*≥‚m@èm\ºãì|ß≠r¶ú¨[—˜B—ºì¬ƒtµ—ß4ã•OBÖ`Êª¿˛ÄÊC–l '.°mµB˛ÖÖ]wàÆiL¨[Õå∆ç¶˚9Â›v ¶ ºLTñ3ﬁÛ8Å6Xaqp^\ZˆF€'œòfŸ>7Ï9öÒWlk£=∂l¯ŸºÁ∫65úç ∆ßPM›0Óîô˜ìf}Ñ¸oü4∞f£∫ÉYÛŸj]∫ùP#X¨÷÷‘Ë¿3±iæn§Ãì˘52V–l +¥…ÀmêínßÉ∆ÏŒ'*6W◊ä*ÃxùÀgM£¸„∞ïÿ uYfïm÷ ?±ø}˜¢‹.ä˚ÁV¢ß8aÒ°~Ú0y
+H24Ü‰©qnMÎ+ëúÙuÙÿ4öuFÄ	GoÇ›(.b˛EŸ·	ÎæRl.+V∆µ3‚]@√CIå;3ÜÕF¬.t5öÂKXÃ-ÖÙî9áç'ní7®bòJE™òaÚŸ©q¬JMØ¥:AA§Ãf-2•e@.¢u;•™>}íêŒ?ÛIµüX6‚B∑y°ú´:DÇ≤e˝óŸk+e¨Éoæ˛ÕˇjIYÅá…÷”\2Ósµ±>ÏMQ=ŒÔΩ$áhnZ¥˚Û|G
+Ç˛ÙG]R8>h2ÇM⁄˚ˆëA0üÕÒ^íA47-2Ä¥&ÓwÑÄOD_˝^ó‘‰£µ~ﬂ0†'˛{IlbZ9<|G$%˝EóxP
+9aˆìÍì@—wf¡(Qw>õVbñ2L|ƒ¸|◊.;‘”~∂rMNkÉ/—+ÍåHŒñZvîY-ÃgΩ…WõFŸy*kEy∞ˇ•Âò	-p'‘∆Å w_À!Áu›ÊØ≠ISÑlÂõ∂z9OØÃgl§bv|E≤&JÖUƒv$n"6Nï∂…ÿ¯∏ìô^≥¿`¨zñ,…Ö5
+ß}ÚÚ√•gÜWˇRé}P=•÷‰JóV$ãoéåÊ°°éõIÈTv»∏™Æ¡¢éßƒ*DC©ƒ∏ Õõ?∫[82¯¡t> $ÍhvHHŒNâpó)1øëÑ(}"‰∂'ÖT8	O°Ç3§Ã∆üq‰¨Ü%∑ﬁ®êá⁄&ë™≈ƒ0—®|≤äß=ß™¢æ∆9ÔAá≠VÔùqπ7ÅÜß$J±-|áÅÏH "Ñ;ÌØ	UÁéÎFC6ˆu"·ù“qï(•;≈Õü|=1,á‡Ó¿ú\ùê|a—ÊŸ£*U{‡S,≈,∏òú+à†<2»ùH6uÂf¶xÖc>;ºG∫}ÚÒ·‡——·È˝AÅ |≠=0;UÓ¨òˆÁÁÅe!}9!⁄rZ”÷ÛÌ=ÊíÄ¥®ä¯É/94‰œ:é”-È Ú£oEÄiGy=•ßR—Sv:•dxiâ∫«B2˜§LYºO<Oññ«	J#Sá7ÓG⁄ÀäãQ<M5£ ƒ'…ÚßÁ{Í¶6x§ Çepç√ûä:*[„@äÈπ∞ ïcoëtO¿btLëãÄÃ\ü A ∏ÚAeÁï∏2Ñ?%≤±@˘πÔ√
+„·tÑÆœ≈ªX«+ˇüÔT¢?´≈Löo[,˙~b»SSŸG…DxªVeáÅ∂?¯@:ZŒ;≠Ôôü9ã9ãh›&0ìµyêŒ	˚˚l
+™^·§
+õ”†ÂºBÃ8f	ß,ÁÖ¸a°∏Êò|cêMñΩkﬂ3‘ÒK∫c*e⁄äaâØ†xWÕA*‘ÕXÀéj`Áƒ æîo[±¯«*†¡≠¬{û?x»·∏TÆ=˘È^aÑò8Û´ètÑ(À≈ıÌ;¯,eR©TqEˇôÂañﬂû"‹&ÌRò,aŸTaªçû=«>#m]Ωÿ ÌÑ—4èí˛™ùüÈ‘<Ó<Ò◊óªÊÔktåm˚nêäcøÚ-≥◊ﬂËπzyUç¯˘ˆ3R≠…È¢x©î=’∫ã¶*[WôÕèÑÓdbS‰BßmÚçDcô3Èt$aNÂNåE™i. #0M≤JmµZÂsn"ä	Ÿ∑9ì’m=} Ú±§ﬂo'-' {V·◊D\·A|)¯‹≈|f˛+¯ΩË-s◊≈◊“ÀÍtÏ⁄æÑ8≤'±<∂1à•YlínCœ´8ÓôGf'üùr2_]z◊6Oiò£KOÅ¯ÉÚœ÷}–,èÔﬂ®≤É˙^º-5è˚k≈(Û«ß«A,`ß5=P3ÒÎ¯G%´»ã[BﬁÍEN˘—ã]ˆB°Ú%ôxgÜ9‚‹Õ&È·1€†¶©mëêWjÀzXÁÉÒ≥«8Ñ'˘3ñB™
+ÅpÂÔÊ´	õÜÅ9<∫ı{jM¶6¸ß∂ÿ»èHÀ'ÎiÖÆá«Z-ª¬ø.ZªËËΩªù…-dœ}˚(ºX™ kãû´@j„”¢aà#◊v˝æ–l0Éü˚äjùiÄõò»ñ†	◊R˘UÂc∂ ·v®aóXß‡¨≥=ÎvVCQ	 ŸÄõT.%9Ù&vÑ–Ÿ˛4bàÒ·˜&∑@ŒΩ>√∞˛Jå¡GO∆\¶m˚<q˝3B§ﬁ≥'<Ô(⁄TÑoô∆6´/â±+S,Eâñ¿$≠‹æÄ;*∫ëC'∏Ä5‹$d@‹l}˝Ô_ëœÊ4y‰€âÔm:[Îåu6–2∏tJ‡¬Ÿy+%û%‚aäç1¸
+ä$[=<eQ=´}ƒã∏ïfù∂*ΩÍùáË@:Ê°˜‹—biÅØlßç∫:&Äî™e(H%Weö*™ü‰Eà‚A?äÚ%Déd£o6iìf◊–9FèúR‡¿>«ÚÛú}â%ç}óÁûNø¸eDôú%qO◊˚tl9Øöb∂ñú=ıπ©àå◊µË∞ÒdVÉ˛¡˛„m§m∑≥ˆÂ∂,O¢8' d¸ô0˛!61„∆¥Po	9¥•÷≤î˘•§iDSÚÜe	¶ÓELwèƒÀU◊*mÜ¬UPôûˆÚ¨2≈†{—⁄‰Õ∑,œR&´hçÖ˙ÊÎﬂ˝∞Z9ù…Œ≈¯Ø<ptˆ9ÉZµ∂ˆ0òÏZÃ1ÅËuÿ$–Oƒ$áqäM∂w;πLvÎdä(8fy¢¡Â‰à˜)(Ÿ6l!Åi≤…Ì|jÆÉk◊fïıâÌ]<º>'åíuö]™L÷…4†•l0}å_«ˇ≥j0jõ∫|,R®-ÃÜ(Z˝Ñ.à K"bÉ©∆è‰Ô”çW‘∏0A>√∂≤K±≠¸í ±}MîJ<øsjb‰Ã†UíÍNJb9A›Z%Ü≈"º¬¸6∆åúE@™âUÍ•jœØŸ˚xÙtãX£À>qÊ8fs”Ö}<]@Õ˝%¥rU`‡·™:˛¢ä¥ì∂÷oˆ`j[YSUÎ-¬Ü÷&Y≥·µnº’g´µT≠áÆ2Â;:¸$L
+”à;Ãµÿˆ©ËX◊Ãï$ùL¨Ãû∂É–ıN|◊3x wsC„4Ôçùë·µY°∂¶	=+L¬îîÜ=_ŒÍIjŸ£ëw8∑á´ÂXä€ysä¡]“xlñ·'≥=•x≈~É¶˛hcïCòj√Ä¬.†Î ∞ß¸dÍö°f>¨∑¬ó=∑ƒE:uò™>·SóîQf§¬·"ªÁÕ∑¢§∫Ã∫¿ˆ˚p•0ˆÆf/˜:iáÉ^°√A˙ª(]J◊t†∆Gw˚ÊÎØˇã<BˆﬁÏfoJS?∫«í¢ÙªÇQ^ñÎ„Å0d!∂d-^-Ô&.¸ô<ap"Õﬁ{ç<ÖŒıq!v• `C*Î∑Ïbï«àîã’ªâˇM ¥Hsk˝±fIV£H•DºÖì{nàW§“ ›®#(èî¡W√›Ûfí™"íá]¶ÙÚ<®ÚŸOµ+øÆ±ÿÌ8”B^êÆŸ¿ëj±4Œ˛mëÆV{’lE„L8Iâ©0ã®(&é™≈r9$∑§DZö©
+ Ççµrd›d¢Qâbé‚{˜ÇéÙOı5$˛£)=˜]Á1öÛâıCƒN0h∆ùW¶±ut5ç7B˝Îœ bﬂNå}Ye4~ïw≈^ÿ∆<>VE´$)Eçƒ¯Ëƒ™œ€kÈπ±° +Ÿ^Ï˚¿T›SzN;Úîh– ™≠Ôæ[8xΩËéà8CÆ˝æÌD?z◊v¢‘ﬂÌH7∞#1“}
+”—∂Zâ=Ïî9nÆ¥âÈ∆%ÎI’?°~Io0u˝–úáªßK◊∑∏Ü%kßp=ôp]Ì(≈°˝˙_˛¸∑ø˛ñ¢·jöæxÂË‰˛˘Î_ˇ+Ÿ$Ø˝ª…˘Ω–'ts»2vM>¿Y•}®ÌáïiQ™dV+5“›Ïmn•:’ú^•⁄VïÁ§àÚàÙZ-™èI£x^ü={zÙ‡‰å<9~zü<9<©%S‘	ó.v€ΩLB¬´›∆XËΩH&HŒ\◊ñjÆ+ÖFßOZ—[˝Z˘zÎ¯◊æã¨NB]˝X ¶ı˙3†É∞w–ëòÙ••º¥.Æa√i6∏rïÖ+ëX
+ZmU?5KéìÉ`:y®∏Yˆ…\!‹»fÅ´z*ábytS9Ô‚AŒ‰—\uÂnÙËl¢o1dﬁaº‡„˚ˆ¢≈ ª ˜_}+™—¢JÆby ©·õSÚy»Rƒó_Ô¢…3ıQß‹)ÆËqqµ$oq{Ø*ÖûòìZ]Œ,j<ÑÆÅIYëÜZ}«rºyXÅõúÊ∞À*	û•Ìﬂ_F»Ã¶P•ùNgBÖßBäNYı&máÜ?°‚NÄJSãgÉH0Ö=ä˙˚çà‹áØ‡ÆöA^Íêà©HoJÒœnÌÅnöæ*GÚ∏óë$√LIÎÆ9˙Ó<dÓ”,zãøJ˘6+(Æ.üN˘]0ï
+ÀçÚ„Ç+¬ÇÛâ>On§”∆F\R“õ#ˇrïä¨NÔ∞ÅW÷úkgó-Fˆ∂∫¡ü∆bjYÕ
+jæﬁetë6É—Iº®a {‰9◊¿ ë¥Z¬!ÒNãDÒ∑ÉGè¨…¥uJrÚÙ”∑éG0Ü:xT\¢:qõéˆ˜‘`>ı≠Ÿ$g>-ªZX7)ò√⁄T%{‡›6/Rëç∑¨`‰$¸Ì»ıUmBÚ0≥ñÿ¥ås√≤—ZàópJó“∑ﬂn∫+~¡=ã*â1Ì–∑fÕ≤Éˇª|~—=EMßOg¡–®JMßÕôÖA46⁄°˚ÿΩ†˛ë–ÊF`mœGxYî<ût°®Z›âÈ˙Tƒù	å‹hÓå6õf‰+ÕÜkÆ2Çrüà≤Ø}∏ı¶¬ö ù„ˇ–pπ;˘Ÿ#ˆ$ısK//ñÑ ‹…GŒ÷9Ôd^•ÚïßÉ÷*6x¡|xå;
+oc ~±ëï•„è¡G+Á5IÂ5 ^êUÃô§l±RºìeY;IŒ¡¸í—÷jã÷í<krÍΩâ=}è◊5f*`Ì·ÆY6£?±pj9kÖŒµâÚ≥∂|—£Z4›ÆJG§Fw∞◊à˝X"Ö&åˇe|bŸ∂Å&# #ñ#N+ÛÊt{Ìƒu<®ïŸıˆxv=Eí∑ÇÏzª˙—H»âI(Õ©kßv–é‰KπJ»†:`pªkv«EÉP)∑ôä£WãìVü8~,r^+≤Ú…HêÏ◊
+,*àÃÄz˝AÛzaÇEA∫Ωk≈◊-£ÕúK»∂oë‡dÅ:akI»VΩRn¥"¶ª¿†ï˜f˜QF!ÑuÇı∏á2nêÅmâ0hÉæ@Ì⁄ëlJ¸e+“´ÒXàãllÿjçÄ’ö·uuBÊ÷3ßU¨BBΩ*–;s§Ω’'~˙‡ËÛ≥„/ê¡ÁOûû˛¨Êôvt3⁄äg⁄€ä3ÌbyO◊8!•4ODﬂ@X^U&,èc†˜£Fë«AªziœEBçt#‚’`Ji®ô;›Ú“–KcvÜØDÂujê’¡D£g†Hú[ÙÇ«á÷ı‰Y¡(≥õh8âB£uqëŒ·W&N≤Ãì¨8∞ªö≈®≥Ω◊u.>ö=ZÉZŸïÍ¡+ñˆ”…
+)3
+∂ì´›õ ´eÜ3Ü24Hwvœe˜Û˚$xR°ôÁ”)u˜úS &nÛiÑSÍ1X¶aì1`ÃÀ	; ¡¬ÅoÅı%±˚©0+Ω»#Íªì˘s◊5Ø$‘J¬±∆pî#éSEbÀU”.º5⁄¨IùÚY‡˙âìªNöØé,ﬂÃ^T§O°1çbæ:2&ÓÑ°^*·C≠ºsuaXedNWZ‡XÆ;ΩDqb	›ôÑL |ΩÏ˘sm˘∑<?EÇmçÉÔ«öx=I]}€Õı”y’ÀÎXD¥5IÅ\o™.T•µ≤à>aù ¬6B¬•ÆJFâmÔ)M]S|súÙåy∞\óâ*ñÔ€√=c4bÃs\pf≤Œ…Úm›ë∂˘l+1l‘»›S‡çﬂ-JÆ≈ç„∂•ôπ7ZÕ¥ù∑ûe@5ŸÀh•¨aj^:éC¬‡«7√XM@•Ûl√·a∆5“d«GpseÊ‹ZÓ®‡5£Âøµ€œ»ÖZıG‰ƒ
+«Ü≠ë”hâö˘{∫G∞¨%7ªC⁄‘œ|Àp&◊ó∂ô–œ,
+£JØ%há0ˆxIoxÔà‚ö“5¢¨-ÔFEÎËfÙ•Vdß˘X>P.ï≠e…: ysM…Z∆6.Yø˛∑?˛ÌØø}G§jÀ˚˚í´WÆˇÊLÿ€}rzxr|üú>8:|¸ò|ˆ˘Ò?’4aˇrn}π™˝z´^L÷ºqìEEßÓŸ|øÎ<”§ú3©<ÎÑ≠y÷]√Ó^Âéµb¨ﬁv>VoÂk	uvkE—˝Ö2ÍiÊ»Ä⁄„≥√’	G=£@=Ã|;£3º√0aS	pG$ Îú	ΩA:ø≤ñ4†c™-ZÕj5q…Èî… Êä>u˘;FÂõEuºÍÍ›'ZŸò∂áù∂è]=/;9àME$ÖæsYœ9Õ€·§˚·0~-óﬁãyH◊/nvEËZÜ`ı¸ƒÙ\§÷Â?ßtﬂª¶–Wêﬂ,sõæÏﬂÛ˝zﬁQu¸£XÈZyÏVÀd∑ﬁ+˘£ÿY∂.Î	˙L?	…‘®D2˜òÓ§nVÃ_eö.¶{|Í≈îÆtø"Ù}k¯Y ‹Ëıæ"ü£NÑÆ+ﬂƒòz≠O-µ≤>÷∏ç†ËÏY}πÓp≤ß.¨ëØ©πôõÓåÿ]ÅlkvÁ^.*XJ©|RïBÀ¯FôlÿUrì`
+–å3\Á∫©hÃ,ü Ôˇèà‘T“¶Œ‰^ÖZ¸wS bU´ ¶YTª,]_¡€9k…≠g £+¬œ¯ÓêÙç!˙»â¥≤⁄•*∞…Xî¡8q†ïd'”çHì8ÃFôd
+!≥“≠¨ØöY˛o …?Âå†Ü;vU±J˘æ‹+Q£ü∑lıQVºƒÎÜúπ-],ü)'ı>˛Êq˙ΩÙ\?ΩqlÃÌ©˘0Ô–4Å‰√GÛ·'ˇ  ˇˇ ·G<ï
