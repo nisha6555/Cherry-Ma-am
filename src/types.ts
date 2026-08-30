@@ -276,4 +276,153 @@ export interface ConceptInfographicData extends Partial<UniversalInfographicSche
   originalUploadedImageUrl?: string;
 }
 
+// ==========================================
+// 🎯 10-Year PYQ 80/20 Guaranteed Repeat Analysis Types
+// ==========================================
+
+export interface PYQRepeatTopic {
+  id: string;
+  topicName: string;
+  chapterName: string;
+  recurrenceFrequency: string; // e.g. "9 / 10 Years (90%)"
+  recurrencePercentage: number; // e.g. 90
+  priorityTier: "guaranteed" | "high" | "moderate"; // guaranteed (9-10 yrs), high (7-8 yrs), moderate (5-6 yrs)
+  marksWeightage: string; // e.g. "5 Marks (Long Answer)", "3 Marks (Short)", "4 Marks (Case Study)"
+  yearsAppeared: number[]; // e.g. [2016, 2017, 2018, 2019, 2021, 2022, 2023, 2024, 2025]
+  questionEvolutionSummary: string; // Explanation of how board twisted this question across years
+  masterFormulaOrTheoremLatex?: string; // Core KaTeX formula/theorem
+  dangerTraps: string[]; // Common traps where 90% students lose marks
+  stepByStepApproach: string[]; // Steps to guarantee full marks
+  samplePYQSnippet: string; // Actual representative question from past board papers
+  mastered?: boolean;
+}
+
+export interface PYQ8020AnalysisReport {
+  reportId: string;
+  generatedAt: string;
+  subject: string;
+  grade: string;
+  board: string;
+  totalPYQAnalyzedYears: number; // e.g. 10
+  yearsSpan: string; // e.g. "2016 – 2026"
+  topTopicsCount: number;
+  estimatedScoreCoveragePercentage: number; // e.g. 82%
+  summaryExecutiveNote: string;
+  guaranteedTopics: PYQRepeatTopic[];
+  highYieldTopics: PYQRepeatTopic[];
+  moderateYieldTopics: PYQRepeatTopic[];
+  topTrapsToAvoid: Array<{ trap: string; fix: string; topic: string }>;
+}
+
+// ==========================================
+// 🎲 Phase 3: AI Predicted Exam Paper 2026 Types
+// ==========================================
+
+export interface PredictedQuestionItem {
+  id: string;
+  questionNumber: number; // e.g. 1, 2, ... 38
+  section: "A" | "B" | "C" | "D" | "E";
+  marks: number; // 1, 2, 3, 5, or 4 (Case Study)
+  chapter: string;
+  topic: string;
+  questionType: "MCQ" | "Assertion_Reason" | "VSA" | "SA" | "LA" | "Case_Study";
+  questionText: string;
+  options?: string[]; // for MCQs (e.g. ["A) ...", "B) ..."])
+  hasInternalChoice?: boolean;
+  orAlternativeQuestionText?: string;
+  predictionConfidence: number; // e.g. 96 (percentage)
+  pyqReferenceYears: number[]; // e.g. [2017, 2019, 2023, 2025]
+  officialMarkingScheme: {
+    stepWiseMarks: Array<{ step: string; marksAwarded: number }>;
+    finalAnswer: string;
+    commonMistakesWarning: string;
+    keyConceptOrFormula: string;
+  };
+  caseStudySubParts?: Array<{
+    partNumber: string; // e.g. "(i)", "(ii)", "(iii)"
+    marks: number;
+    question: string;
+    solution: string;
+  }>;
+}
+
+export interface AIPredictedPaperReport {
+  paperId: string;
+  generatedAt: string;
+  subject: string;
+  grade: string;
+  board: string;
+  academicYear: string; // "2025-2026"
+  totalMarks: number; // 80 or 70
+  totalTimeMinutes: number; // 180
+  paperCode: string; // e.g. "SET-2026-ALPHA"
+  generalInstructions: string[];
+  sectionsSummary: {
+    sectionA: { name: string; questionCount: number; marksEach: number; totalMarks: number };
+    sectionB: { name: string; questionCount: number; marksEach: number; totalMarks: number };
+    sectionC: { name: string; questionCount: number; marksEach: number; totalMarks: number };
+    sectionD: { name: string; questionCount: number; marksEach: number; totalMarks: number };
+    sectionE: { name: string; questionCount: number; marksEach: number; totalMarks: number };
+  };
+  questions: PredictedQuestionItem[];
+  highProbabilityScoreTips: string[];
+}
+
+
+export interface ChapterWeightageBreakdown {
+  id: string;
+  chapterName: string;
+  unitName?: string;
+  totalAvgMarks: number; // e.g. 12
+  marksPercentage: number; // e.g. 15%
+  weightageTier: "tier1_critical" | "tier2_important" | "tier3_foundational"; // Tier 1 (10+ marks), Tier 2 (6-9 marks), Tier 3 (2-5 marks)
+  sectionsBreakdown: {
+    sectionA_MCQ: number; // 1 Mark MCQs count
+    sectionB_VSA: number; // 2 Marks Short count
+    sectionC_SA: number; // 3 Marks Short count
+    sectionD_LA: number; // 5 Marks Long count
+    sectionE_CaseStudy: number; // 4 Marks Case Study count
+  };
+  tenYearTrend: {
+    trendDirection: "rising" | "stable" | "declining"; // e.g. rising due to new competency pattern
+    avgHistoricalMarks: number;
+    highestEverMarksInSingleYear: number;
+    trendCommentary: string;
+  };
+  topScoringSubTopics: string[]; // High-yield sub-sections
+  timeAllocationRecommendedMins: number; // Recommended study time in exam prep (e.g. 180 mins)
+}
+
+export interface UnitWeightageSummary {
+  unitName: string;
+  totalMarks: number;
+  percentageOfExam: number;
+  chaptersCount: number;
+}
+
+export interface PYQWeightageHeatmapReport {
+  reportId: string;
+  generatedAt: string;
+  subject: string;
+  grade: string;
+  board: string;
+  totalExamMarks: number; // e.g. 80 (or 70 for science/physics)
+  analyzedYearsSpan: string; // e.g. "2016 – 2026"
+  executiveHeatmapSummary: string;
+  unitSummaries: UnitWeightageSummary[];
+  chapterBreakdowns: ChapterWeightageBreakdown[];
+  sectionWiseDistribution: {
+    sectionA_1Mark: { totalMarks: number; questionCount: number; targetTimeMinutes: number; description: string };
+    sectionB_2Mark: { totalMarks: number; questionCount: number; targetTimeMinutes: number; description: string };
+    sectionC_3Mark: { totalMarks: number; questionCount: number; targetTimeMinutes: number; description: string };
+    sectionD_5Mark: { totalMarks: number; questionCount: number; targetTimeMinutes: number; description: string };
+    sectionE_4Mark_CaseStudy: { totalMarks: number; questionCount: number; targetTimeMinutes: number; description: string };
+  };
+  smartExamDayTimeStrategy: {
+    readingTime15MinsPlan: string[];
+    sectionOrderSuggestion: string[];
+    bufferReserveMins: number;
+  };
+}
+
 

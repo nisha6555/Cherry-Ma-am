@@ -113,7 +113,7 @@ export default function App() {
 
   // Document-driven teaching system states
   const [activeDocument, setActiveDocument] = useState<{ filename: string; mimeType: string; markdown: string; mode?: string; detectedSubject?: string } | null>(null);
-  const [uploadMode, setUploadMode] = useState<"guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet">("explain");
+  const [uploadMode, setUploadMode] = useState<"guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet" | "pyq">("explain");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedButWaitingWakeup, setUploadedButWaitingWakeup] = useState(false);
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);

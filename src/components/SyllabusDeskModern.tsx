@@ -1,19 +1,27 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   ArrowLeft, User, Sparkles, CheckCircle, Upload, RefreshCw, Youtube, Video, FileText,
   ChevronRight, GraduationCap, BookOpen, Clock, History, Play, Check, Flame, HelpCircle,
-  Mic, MessageSquare
+  Mic, MessageSquare, Target, Award, TrendingUp, UploadCloud, FileUp, Trash2, Paperclip,
+  CheckCircle2, Info
 } from "lucide-react";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { HomeworkMaker } from "./HomeworkMaker";
 import { ProblemGuideChat } from "./ProblemGuideChat";
 import { ConceptInfographicPoster } from "./ConceptInfographicPoster";
-import { ConceptInfographicData } from "../types";
+import { PYQUploadStudio } from "./PYQUploadStudio";
+import { PYQReportsHub } from "./PYQReportsHub";
+import { PYQValidationAlertModal } from "./PYQValidationAlertModal";
+import { PYQ8020ReportModal } from "./PYQ8020ReportModal";
+import { PYQWeightageHeatmapModal } from "./PYQWeightageHeatmapModal";
+import { AIPredictedPaperModal } from "./AIPredictedPaperModal";
+import { ConceptInfographicData, PYQ8020AnalysisReport, PYQWeightageHeatmapReport, AIPredictedPaperReport } from "../types";
 import { safeSavePastSessions } from "../utils/safeStorage";
 import { saveActiveLearningContext } from "../utils/activeLearningStore";
 import { compressImageIfPossible } from "../utils/imageCompressor";
 import { generateUniversalFallback, adaptUniversalToLegacy } from "../utils/distillationEngine";
+import { getCurated8020Report, getCuratedWeightageHeatmapReport, getCuratedPredictedPaperReport } from "../utils/pyqAnalysisEngine";
 
 interface SyllabusDeskModernProps {
   studentDetails: {
@@ -26,8 +34,8 @@ interface SyllabusDeskModernProps {
   setStudentDetails: React.Dispatch<React.SetStateAction<any>>;
   activeDocument: any;
   setActiveDocument: React.Dispatch<React.SetStateAction<any>>;
-  uploadMode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet";
-  setUploadMode: (mode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet") => void;
+  uploadMode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet" | "pyq";
+  setUploadMode: (mode: "guide" | "explain" | "mistake" | "homework" | "doubt" | "socratic" | "cheatsheet" | "pyq") => void;
   youtubeUrl: string;
   setYoutubeUrl: (url: string) => void;
   isYoutubeLoading: boolean;
@@ -98,6 +106,335 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
   const [cheatSheetData, setCheatSheetData] = useState<ConceptInfographicData | null>(null);
   const [loadingCheatSheet, setLoadingCheatSheet] = useState(false);
   const [cheatSheetTopicInput, setCheatSheetTopicInput] = useState("");
+
+  // 🎯 10-Year PYQ 80/20 Analysis State (Phase 1)
+  const [showPYQ8020Modal, setShowPYQ8020Modal] = useState(false);
+  const [pyq8020Report, setPyq8020Report] = useState<PYQ8020AnalysisReport | null>(null);
+  const [loadingPYQ8020, setLoadingPYQ8020] = useState(false);
+
+  // 🗺️ 10-Year Marking Weightage Heatmap State (Phase 2)
+  const [showHeatmapModal, setShowHeatmapModal] = useState(false);
+  const [heatmapReport, setHeatmapReport] = useState<PYQWeightageHeatmapReport | null>(null);
+  const [loadingHeatmap, setLoadingHeatmap] = useState(false);
+
+  // 🎲 2026 Board Examination AI Predicted Paper State (Phase 3)
+  const [showPredictedPaperModal, setShowPredictedPaperModal] = useState(false);
+  const [predictedPaperReport, setPredictedPaperReport] = useState<AIPredictedPaperReport | null>(null);
+  const [loadingPredictedPaper, setLoadingPredictedPaper] = useState(false);
+
+  // 📄 Dedicated Custom PYQ Document Upload State
+  const [showPYQReportsHub, setShowPYQReportsHub] = useState(false);
+  const pyqFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPYQ, setIsUploadingPYQ] = useState(false);
+  const [uploadedPYQName, setUploadedPYQName] = useState<string>("");
+
+  // 🎯 Target Board Grade check: PYQ Intelligence is strictly available for Class 10 & 12
+  const isPYQEligible = React.useMemo(() => {
+    const g = (studentDetails.grade || "Class 10").toString().toLowerCase().trim();
+    const isClass10 = /\b10(th)?\b/i.test(g) || g.includes("class 10") || g.includes("grade 10") || g === "10" || g === "10th" || g.includes("tenth") || g.includes("class x");
+    const isClass12 = /\b12(th)?\b/i.test(g) || g.includes("class 12") || g.includes("grade 12") || g === "12" || g === "12th" || g.includes("twelfth") || g.includes("class xii");
+    return isClass10 || isClass12;
+  }, [studentDetails.grade]);
+
+  // Auto fallback to "explain" if current grade is not Class 10 or 12
+  useEffect(() => {
+    if (!isPYQEligible && uploadMode === "pyq") {
+      setUploadMode("explain");
+    }
+  }, [isPYQEligible, uploadMode, setUploadMode]);
+
+  // 🛡️ PYQ AI Validation Guardrail Alert State
+  const [pyqValidationAlert, setPyqValidationAlert] = useState<{
+    isOpen: boolean;
+    fileName: string;
+    reason?: string;
+    detectedDocType?: string;
+    detectedSubject?: string;
+    pendingDoc?: any;
+  } | null>(null);
+
+  const handlePYQFileUpload = async (file: File) => {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      addToast("File size too large. Please select a file under 25MB.", "error");
+      return;
+    }
+
+    setIsUploadingPYQ(true);
+    addToast(`Extracting questions, formulas & patterns from "${file.name}"... ⏳`, "info");
+
+    try {
+      let resolvedMime = file.type || "";
+      if (!resolvedMime || resolvedMime === "application/octet-stream") {
+        const lower = file.name.toLowerCase();
+        if (lower.endsWith(".pdf")) resolvedMime = "application/pdf";
+        else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) resolvedMime = "image/jpeg";
+        else if (lower.endsWith(".png")) resolvedMime = "image/png";
+        else if (lower.endsWith(".webp")) resolvedMime = "image/webp";
+        else if (lower.endsWith(".txt")) resolvedMime = "text/plain";
+        else resolvedMime = "application/pdf";
+      }
+
+      const dataUrl = await compressImageIfPossible(file, 1400, 0.75);
+      const parts = dataUrl.split(",");
+      const base64Data = parts[1] || "";
+      const mimeMatch = parts[0]?.match(/:(.*?);/);
+      const finalMime = (mimeMatch && mimeMatch[1]) ? mimeMatch[1] : resolvedMime;
+
+      const uploadRes = await fetch("/api/upload-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          mimeType: finalMime,
+          base64Data,
+          mode: "pyq",
+        })
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to process document");
+      }
+
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        throw new Error(uploadData.error || "Failed to parse document");
+      }
+
+      const isQP = uploadData.isQuestionPaper !== false;
+      const newDoc = {
+        name: file.name,
+        type: file.type,
+        markdown: uploadData.markdown || "",
+        detectedSubject: uploadData.detectedSubject,
+        detectedGrade: uploadData.detectedGrade,
+        detectedBoard: uploadData.detectedBoard,
+        isQuestionPaper: isQP,
+        validationReason: uploadData.validationReason,
+        detectedDocType: uploadData.detectedDocType
+      };
+
+      // ⚠️ Validation Guardrail: If file is not an exam question paper
+      if (!isQP) {
+        setPyqValidationAlert({
+          isOpen: true,
+          fileName: file.name,
+          reason: uploadData.validationReason || "AI analysis ke mutabik is document me exam questions, marks ya problem statements nahi mile.",
+          detectedDocType: uploadData.detectedDocType || "non_question_paper",
+          detectedSubject: uploadData.detectedSubject,
+          pendingDoc: newDoc
+        });
+        addToast(`⚠️ Non-question paper detected in "${file.name}". Please choose an option.`, "info");
+        return;
+      }
+
+      // Valid Question Paper
+      setActiveDocument(newDoc);
+      setUploadedPYQName(file.name);
+
+      if (uploadData.detectedSubject) {
+        setStudentDetails((prev: any) => ({ ...prev, subject: uploadData.detectedSubject }));
+      }
+
+      // Reset stale reports so fresh custom AI generation occurs
+      setPyq8020Report(null);
+      setHeatmapReport(null);
+      setPredictedPaperReport(null);
+
+      // Instantly open the dedicated PYQ Reports Hub page
+      setShowPYQReportsHub(true);
+
+      addToast(`🎉 Custom PYQ Paper "${file.name}" loaded! Tap any report below to inspect custom analysis.`, "success");
+    } catch (err: any) {
+      console.error("PYQ Upload Error:", err);
+      addToast("Could not parse file. Reverting to verified 10-Year National Exam Database.", "error");
+    } finally {
+      setIsUploadingPYQ(false);
+      if (pyqFileInputRef.current) pyqFileInputRef.current.value = "";
+    }
+  };
+
+  const handleValidationUseNationalDB = () => {
+    setPyqValidationAlert(null);
+    setUploadedPYQName("");
+    setActiveDocument(null);
+    setPyq8020Report(null);
+    setHeatmapReport(null);
+    setPredictedPaperReport(null);
+    setShowPYQReportsHub(true);
+    addToast(`✨ Switched to 10-Year National Board Question Bank for ${studentDetails.subject}!`, "success");
+  };
+
+  const handleValidationUploadAnother = () => {
+    setPyqValidationAlert(null);
+    pyqFileInputRef.current?.click();
+  };
+
+  const handleValidationSwitchMode = (targetMode: "explain" | "cheatsheet" | "doubt") => {
+    if (pyqValidationAlert?.pendingDoc) {
+      setActiveDocument(pyqValidationAlert.pendingDoc);
+    }
+    setPyqValidationAlert(null);
+    setUploadMode(targetMode);
+    addToast(`Document converted to ${targetMode.toUpperCase()} mode!`, "success");
+  };
+
+  const handleValidationProceedAnyway = () => {
+    if (pyqValidationAlert?.pendingDoc) {
+      setActiveDocument(pyqValidationAlert.pendingDoc);
+      setUploadedPYQName(pyqValidationAlert.fileName);
+      if (pyqValidationAlert.detectedSubject) {
+        setStudentDetails((prev: any) => ({ ...prev, subject: pyqValidationAlert.detectedSubject }));
+      }
+      setPyq8020Report(null);
+      setHeatmapReport(null);
+      setPredictedPaperReport(null);
+      setShowPYQReportsHub(true);
+    }
+    setPyqValidationAlert(null);
+    addToast(`Proceeding with "${pyqValidationAlert?.fileName}" in Custom PYQ Mode.`, "info");
+  };
+
+  const handleClearUploadedPYQ = () => {
+    setUploadedPYQName("");
+    setActiveDocument(null);
+    setPyq8020Report(null);
+    setHeatmapReport(null);
+    setPredictedPaperReport(null);
+    addToast("Switched back to verified 10-Year National Exam Database (CBSE 2016-2026).", "info");
+  };
+
+  const handleFetchPredictedPaper = async () => {
+    setLoadingPredictedPaper(true);
+    try {
+      const response = await fetch("/api/pyq-predicted-paper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: studentDetails.subject || "Mathematics",
+          grade: studentDetails.grade || "Class 10th",
+          board: studentDetails.board || "CBSE",
+          pyqDocumentText: activeDocument?.markdown || ""
+        })
+      });
+
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success && resData.data) {
+          setPredictedPaperReport(resData.data);
+          addToast("2026 AI Predicted Paper Generated! 🎲", "success");
+          return;
+        }
+      }
+      throw new Error("Predicted Paper API returned non-success");
+    } catch (err: any) {
+      console.warn("Using curated Predicted Paper report:", err);
+      const fallbackPaper = getCuratedPredictedPaperReport(
+        studentDetails.subject || "Mathematics",
+        studentDetails.grade || "Class 10th",
+        studentDetails.board || "CBSE"
+      );
+      setPredictedPaperReport(fallbackPaper);
+      addToast("Loaded 2026 AI Predicted Board Paper & Marking Scheme! 🎲", "info");
+    } finally {
+      setLoadingPredictedPaper(false);
+    }
+  };
+
+  const handleOpenPredictedPaper = async () => {
+    setShowPredictedPaperModal(true);
+    if (!predictedPaperReport) {
+      await handleFetchPredictedPaper();
+    }
+  };
+
+  const handleFetchHeatmap = async () => {
+    setLoadingHeatmap(true);
+    try {
+      const response = await fetch("/api/pyq-marking-heatmap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: studentDetails.subject || "Mathematics",
+          grade: studentDetails.grade || "Class 10th",
+          board: studentDetails.board || "CBSE",
+          pyqDocumentText: activeDocument?.markdown || ""
+        })
+      });
+
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success && resData.data) {
+          setHeatmapReport(resData.data);
+          addToast("Marking Weightage Heatmap Generated! 🗺️", "success");
+          return;
+        }
+      }
+      throw new Error("Heatmap API returned non-success");
+    } catch (err: any) {
+      console.warn("Using curated Weightage Heatmap domain report:", err);
+      const fallbackReport = getCuratedWeightageHeatmapReport(
+        studentDetails.subject || "Mathematics",
+        studentDetails.grade || "Class 10th",
+        studentDetails.board || "CBSE"
+      );
+      setHeatmapReport(fallbackReport);
+      addToast("Loaded 10-Year Marking Blueprint & Section Heatmap! 🗺️", "info");
+    } finally {
+      setLoadingHeatmap(false);
+    }
+  };
+
+  const handleOpenHeatmap = async () => {
+    setShowHeatmapModal(true);
+    if (!heatmapReport) {
+      await handleFetchHeatmap();
+    }
+  };
+
+  const handleFetchPYQ8020 = async () => {
+    setLoadingPYQ8020(true);
+    try {
+      const response = await fetch("/api/pyq-analyze-8020", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: studentDetails.subject || "Mathematics",
+          grade: studentDetails.grade || "Class 10th",
+          board: studentDetails.board || "CBSE",
+          pyqDocumentText: activeDocument?.markdown || ""
+        })
+      });
+
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success && resData.data) {
+          setPyq8020Report(resData.data);
+          addToast("10-Year PYQ 80/20 Analysis Generated! 🎯", "success");
+          return;
+        }
+      }
+      throw new Error("PYQ 80/20 analysis API returned non-success");
+    } catch (err: any) {
+      console.warn("Using curated 80/20 domain report:", err);
+      const fallbackReport = getCurated8020Report(
+        studentDetails.subject || "Mathematics",
+        studentDetails.grade || "Class 10th",
+        studentDetails.board || "CBSE"
+      );
+      setPyq8020Report(fallbackReport);
+      addToast("Loaded 10-Year High-Yield Guaranteed Blueprint! 🎯", "info");
+    } finally {
+      setLoadingPYQ8020(false);
+    }
+  };
+
+  const handleOpenPYQ8020 = async () => {
+    setShowPYQ8020Modal(true);
+    if (!pyq8020Report) {
+      await handleFetchPYQ8020();
+    }
+  };
 
   const handleGenerateCheatSheet = async (topicToGen?: string) => {
     const finalTopic = (topicToGen || cheatSheetTopicInput || studentDetails.subject || "Important Concepts").trim();
@@ -928,6 +1265,23 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
               <span className="text-xs sm:text-sm">⚡</span>
               <span className="text-[11px] sm:text-xs font-bold tracking-tight">Visual Cheat Sheet</span>
             </button>
+            {isPYQEligible && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadMode("pyq");
+                  addToast("Mode set: 10-Year PYQ & Board Exam Intelligence! 📄", "info");
+                }}
+                className={`shrink-0 py-2 px-3 sm:px-3.5 rounded-lg sm:rounded-xl flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer text-center select-none whitespace-nowrap ${
+                  uploadMode === "pyq"
+                    ? "bg-gradient-to-r from-[#0a3641] via-teal-900 to-slate-950 text-[#c4f500] shadow-sm border border-[#c4f500]/30 font-bold scale-[1.02]"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold"
+                }`}
+              >
+                <span className="text-xs sm:text-sm">📄</span>
+                <span className="text-[11px] sm:text-xs font-bold tracking-tight">PYQ Intelligence</span>
+              </button>
+            )}
           </div>
 
           {/* Clean 1-Line Description */}
@@ -942,8 +1296,12 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
               <span><strong className="text-[#0a3641]">Doubt Solver:</strong> Upload difficult questions or exam doubts to resolve on chalkboard.</span>
             ) : uploadMode === "homework" ? (
               <span><strong className="text-[#0a3641]">Home Work Maker:</strong> Instant notebook-ready step-by-step solutions formatted for your copy.</span>
-            ) : (
+            ) : uploadMode === "cheatsheet" ? (
               <span><strong className="text-amber-800">Visual Cheat Sheet:</strong> Upload chapter PDF or notes to generate a 1-page high-yield visual infographic poster.</span>
+            ) : uploadMode === "pyq" && isPYQEligible ? (
+              <span><strong className="text-teal-900 font-bold">10-Year PYQ Intelligence:</strong> Upload your Question Paper PDF to analyze recurrence patterns, weightage heatmaps & 2026 predicted papers.</span>
+            ) : (
+              <span><strong className="text-[#0a3641]">Explainer Mode:</strong> Structured chapter concepts on blackboard with formulas & diagrams.</span>
             )}
           </div>
         </div>
@@ -1095,6 +1453,48 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
               </div>
             )}
           </div>
+        ) : uploadMode === "pyq" && isPYQEligible ? (
+          <>
+            <PYQUploadStudio
+              studentDetails={{
+                name: studentDetails.name,
+                grade: studentDetails.grade,
+                subject: studentDetails.subject,
+                board: studentDetails.board || "CBSE",
+              }}
+              uploadedPYQName={uploadedPYQName}
+              isUploading={isUploadingPYQ}
+              onUploadFile={handlePYQFileUpload}
+              addToast={addToast}
+            />
+
+            {showPYQReportsHub && (
+              <PYQReportsHub
+                studentDetails={{
+                  name: studentDetails.name,
+                  grade: studentDetails.grade,
+                  subject: studentDetails.subject,
+                  board: studentDetails.board || "CBSE",
+                }}
+                uploadedPYQName={uploadedPYQName}
+                onBackToDesk={() => setShowPYQReportsHub(false)}
+                onOpenReport1_8020={handleOpenPYQ8020}
+                onOpenReport2_Heatmap={handleOpenHeatmap}
+                onOpenReport3_PredictedPaper={handleOpenPredictedPaper}
+                onUploadNewPaper={() => {
+                  setShowPYQReportsHub(false);
+                  pyqFileInputRef.current?.click();
+                }}
+                onResetToNationalDB={handleClearUploadedPYQ}
+                loading8020={loadingPYQ8020}
+                loadingHeatmap={loadingHeatmap}
+                loadingPredictedPaper={loadingPredictedPaper}
+                pyq8020Report={pyq8020Report}
+                heatmapReport={heatmapReport}
+                predictedPaperReport={predictedPaperReport}
+              />
+            )}
+          </>
         ) : (
           <div className="bg-white border border-slate-200/80 rounded-[28px] p-4 shadow-xs text-left space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
@@ -1615,6 +2015,57 @@ export const SyllabusDeskModern: React.FC<SyllabusDeskModernProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 🎯 10-Year PYQ 80/20 Guaranteed Repeat Topics Modal (Phase 1) */}
+      <PYQ8020ReportModal
+        isOpen={showPYQ8020Modal}
+        onClose={() => setShowPYQ8020Modal(false)}
+        report={pyq8020Report}
+        isLoading={loadingPYQ8020}
+        onRefreshOrReanalyze={handleFetchPYQ8020}
+        studentName={studentDetails.name}
+        addToast={addToast}
+      />
+
+      {/* 🗺️ 10-Year Marking Weightage & Section Heatmap Modal (Phase 2) */}
+      <PYQWeightageHeatmapModal
+        isOpen={showHeatmapModal}
+        onClose={() => setShowHeatmapModal(false)}
+        report={heatmapReport}
+        isLoading={loadingHeatmap}
+        onRefreshOrReanalyze={handleFetchHeatmap}
+        studentName={studentDetails.name}
+        addToast={addToast}
+      />
+
+      {/* 🎲 2026 Board Examination AI Predicted Paper Modal (Phase 3) */}
+      <AIPredictedPaperModal
+        isOpen={showPredictedPaperModal}
+        onClose={() => setShowPredictedPaperModal(false)}
+        report={predictedPaperReport}
+        isLoading={loadingPredictedPaper}
+        onRefreshOrReanalyze={handleFetchPredictedPaper}
+        studentName={studentDetails.name}
+        addToast={addToast}
+      />
+
+      {/* ⚠️ AI Validation Guardrail & Fallback Modal */}
+      {pyqValidationAlert && (
+        <PYQValidationAlertModal
+          isOpen={pyqValidationAlert.isOpen}
+          fileName={pyqValidationAlert.fileName}
+          reason={pyqValidationAlert.reason}
+          detectedDocType={pyqValidationAlert.detectedDocType}
+          detectedSubject={pyqValidationAlert.detectedSubject}
+          currentSubject={studentDetails.subject || "Mathematics"}
+          currentGrade={studentDetails.grade || "Class 10th"}
+          onUseNationalDB={handleValidationUseNationalDB}
+          onUploadAnother={handleValidationUploadAnother}
+          onSwitchToMode={handleValidationSwitchMode}
+          onProceedAnyway={handleValidationProceedAnyway}
+          onClose={() => setPyqValidationAlert(null)}
+        />
       )}
     </div>
   );
