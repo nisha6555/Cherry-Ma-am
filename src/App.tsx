@@ -17,6 +17,7 @@ import { QuickQuizView } from "./components/QuickQuizView";
 import { SyllabusDeskModern } from "./components/SyllabusDeskModern";
 import { LearnerProfileModal } from "./components/LearnerProfileModal";
 import { QuickDoubtWidget } from "./components/QuickDoubtWidget";
+import { PwaInstallPromptModal } from "./components/PwaInstallPromptModal";
 import AmbientFocusAudio from "./components/AmbientFocusAudio";
 import katex from "katex";
 import { triggerCelebrationConfetti } from "./utils/confetti";
@@ -142,6 +143,28 @@ export default function App() {
   const [activeMobileTab, setActiveMobileTab] = useState<"mic" | "topics" | "doubt" | "quiz">("quiz");
   const [isQuizFullScreenOpen, setIsQuizFullScreenOpen] = useState(false);
   const [isLearnerProfileModalOpen, setIsLearnerProfileModalOpen] = useState(false);
+  const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
+
+  // Automatically trigger the PWA "Install App" popup on landing if not in standalone mode
+  useEffect(() => {
+    try {
+      const isStandalone = 
+        window.matchMedia("(display-mode: standalone)").matches || 
+        (window.navigator as any).standalone === true;
+
+      // Check if user previously dismissed in this session
+      const dismissedThisSession = sessionStorage.getItem("pwa_install_dismissed_session");
+
+      if (!isStandalone && !dismissedThisSession) {
+        const timer = setTimeout(() => {
+          setShowPwaInstallModal(true);
+        }, 1200); // 1.2s gentle delay after page load for smooth entry
+        return () => clearTimeout(timer);
+      }
+    } catch (_) {
+      // Fallback
+    }
+  }, []);
 
   // Parse markdown content into distinct sequential slides or topics
   const topics = useMemo(() => {
@@ -2228,8 +2251,19 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
               <span className="text-xs font-mono text-[#486a73] font-black">CHERRY MA'AM</span>
             </div>
             
-            {/* Top Right Action - Login / Register button */}
-            <div>
+            {/* Top Right Action - PWA Install & Login / Register button */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPwaInstallModal(true)}
+                className="bg-gradient-to-r from-[#c4f500] to-[#b8eb00] hover:brightness-105 text-[#0a3641] text-[9.5px] font-black tracking-wide uppercase px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all shadow-sm cursor-pointer select-none active:scale-95 border border-[#0a3641]/20"
+                title="Install Cherry AI Web App (PWA)"
+              >
+                <Download className="w-3 h-3 text-[#0a3641] stroke-[2.5]" />
+                <span className="hidden xs:inline">Install App</span>
+                <span>📱</span>
+              </button>
+
               {user ? (
                 studentDetails.name ? (
                   <div className="flex items-center space-x-1.5">
@@ -3792,6 +3826,20 @@ MANDATORY PHASE 1 ('intro') EXECUTION:
         isOpen={isLearnerProfileModalOpen}
         onClose={() => setIsLearnerProfileModalOpen(false)}
         onToast={addToast}
+      />
+
+      {/* PWA AUTOMATIC INSTALL APP PROMPT MODAL */}
+      <PwaInstallPromptModal
+        isOpen={showPwaInstallModal}
+        onClose={() => {
+          setShowPwaInstallModal(false);
+          try {
+            sessionStorage.setItem("pwa_install_dismissed_session", "true");
+          } catch (_) {}
+        }}
+        onInstalledSuccess={() => {
+          addToast("🎉 Cherry AI Web App installed successfully to your Home Screen!", "success");
+        }}
       />
 
       {/* ABSOLUTE FLOATING SYSTEM TOAST notifications */}

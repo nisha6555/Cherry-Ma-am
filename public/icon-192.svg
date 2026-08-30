@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bgGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a3641"/>
+      <stop offset="100%" stop-color="#041a14"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad192)"/>
+  <rect x="6" y="6" width="180" height="180" rx="36" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-opacity="0.4"/>
+  <g transform="translate(24, 24)">
+    <rect width="144" height="144" rx="24" fill="#06221c" stroke="#c4f500" stroke-width="3"/>
+    <!-- Mortarboard Cap -->
+    <path d="M72 26 L124 53 L72 80 L20 53 Z" fill="#c4f500"/>
+    <path d="M41 65 L41 92 C41 107 103 107 103 92 L103 65" fill="none" stroke="#c4f500" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="124" cy="53" r="4" fill="#f43f5e"/>
+    <path d="M124 53 L130 84" stroke="#f43f5e" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Left & Right Cherries -->
+    <circle cx="53" cy="114" r="14" fill="#f43f5e"/>
+    <circle cx="87" cy="112" r="14" fill="#e11d48"/>
+    <path d="M53 100 C57 76 69 68 72 66" fill="none" stroke="#c4f500" stroke-width="4" stroke-linecap="round"/>
+    <path d="M87 98 C83 76 75 68 72 66" fill="none" stroke="#c4f500" stroke-width="4" stroke-linecap="round"/>
+    <polygon points="118,98 121,104 127,107 121,110 118,116 115,110 109,107 115,104" fill="#c4f500"/>
+  </g>
+</svg>

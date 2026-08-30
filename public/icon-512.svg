@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a3641"/>
+      <stop offset="50%" stop-color="#041a14"/>
+      <stop offset="100%" stop-color="#020e0a"/>
+    </linearGradient>
+    <linearGradient id="chalkGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c4f500"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded App Background with subtle chalkboard texture border -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#2dd4bf" stroke-width="4" stroke-opacity="0.3" stroke-dasharray="12 8"/>
+  
+  <!-- Center Blackboard Badge -->
+  <g filter="url(#shadow)" transform="translate(64, 64)">
+    <rect width="384" height="384" rx="64" fill="#06221c" stroke="#c4f500" stroke-width="6"/>
+    
+    <!-- Cherry Ma'am Icon / Graduation Cap & Cherries -->
+    <!-- Mortarboard Cap -->
+    <path d="M192 70 L330 140 L192 210 L54 140 Z" fill="#c4f500" opacity="0.95"/>
+    <path d="M110 170 L110 240 C110 280 274 280 274 240 L274 170" fill="none" stroke="#c4f500" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="330" cy="140" r="10" fill="#f43f5e"/>
+    <path d="M330 140 L345 220" stroke="#f43f5e" stroke-width="8" stroke-linecap="round"/>
+    
+    <!-- Glowing Twin Cherries & AI Sparks -->
+    <!-- Left Cherry -->
+    <circle cx="140" cy="300" r="38" fill="#f43f5e" filter="url(#shadow)"/>
+    <ellipse cx="128" cy="288" rx="10" ry="14" fill="#fda4af" opacity="0.8" transform="rotate(-30 128 288)"/>
+    
+    <!-- Right Cherry -->
+    <circle cx="230" cy="295" r="38" fill="#e11d48" filter="url(#shadow)"/>
+    <ellipse cx="218" cy="283" rx="10" ry="14" fill="#fda4af" opacity="0.8" transform="rotate(-30 218 283)"/>
+    
+    <!-- Cherry Stems & Leaf -->
+    <path d="M140 262 C150 200 180 180 188 175" fill="none" stroke="#c4f500" stroke-width="10" stroke-linecap="round"/>
+    <path d="M230 257 C220 200 196 180 188 175" fill="none" stroke="#c4f500" stroke-width="10" stroke-linecap="round"/>
+    <path d="M188 175 Q220 160 215 140 Q180 155 188 175 Z" fill="#22c55e"/>
+
+    <!-- Sparks / AI Stars -->
+    <polygon points="310,260 318,276 334,284 318,292 310,308 302,292 286,284 302,276" fill="#c4f500"/>
+    <polygon points="80,240 85,250 95,255 85,260 80,270 75,260 65,255 75,250" fill="#38bdf8"/>
+  </g>
+</svg>

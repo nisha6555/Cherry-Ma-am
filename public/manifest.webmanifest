@@ -1,0 +1,51 @@
+{
+  "name": "Cherry AI Classroom - Voice AI Tutor & Battle Arena",
+  "short_name": "Cherry AI",
+  "description": "Interactive Indian Hinglish AI Classroom with Cherry Ma'am, Blackboard notes & Multiplayer Battle Arena",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#041a14",
+  "theme_color": "#0a3641",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "games", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Live Class",
+      "short_name": "Classroom",
+      "description": "Jump directly into live AI voice classroom",
+      "url": "/?mode=classroom",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Quiz Battle Arena",
+      "short_name": "Quiz Battle",
+      "description": "Play live multiplayer study quiz battles",
+      "url": "/?mode=battle",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}
