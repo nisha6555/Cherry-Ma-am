@@ -154,5 +154,19 @@ service cloud.firestore {
         allow update, delete: if false; // Dialogue message transcripts are historically immutable
       }
     }
+
+    // Multiplayer Battle Arena Rooms
+    match /battleRooms/{roomId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isEmailVerifiedOrAnonymous() && isValidId(roomId);
+      allow update: if isSignedIn() && isEmailVerifiedOrAnonymous();
+      allow delete: if isSignedIn() && resource.data.hostUid == request.auth.uid;
+
+      match /participants/{participantId} {
+        allow get, list: if isSignedIn();
+        allow create, update: if isSignedIn() && isEmailVerifiedOrAnonymous();
+        allow delete: if isSignedIn() && (request.auth.uid == participantId || request.auth.uid == get(/databases/$(database)/documents/battleRooms/$(roomId)).data.hostUid);
+      }
+    }
   }
 }

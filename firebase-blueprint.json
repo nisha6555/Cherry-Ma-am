@@ -194,6 +194,126 @@
         }
       },
       "required": ["score", "total", "accuracy", "subject", "grade"]
+    },
+    "battleRoom": {
+      "title": "Battle Room",
+      "description": "A multiplayer quiz battle room with syllabus, schedule, questions, and participant tracking",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Unique room ID"
+        },
+        "code": {
+          "type": "string",
+          "description": "6-digit or formatted room join code (e.g. CHERRY-4821)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title or exam name of the battle room"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject for this battle quiz"
+        },
+        "grade": {
+          "type": "string",
+          "description": "Grade of the quiz"
+        },
+        "chapterOrFileName": {
+          "type": "string",
+          "description": "Syllabus topic or uploaded document name"
+        },
+        "numQuestions": {
+          "type": "number",
+          "description": "Total number of questions"
+        },
+        "timePerQuestion": {
+          "type": "number",
+          "description": "Seconds allowed per question"
+        },
+        "scheduledTime": {
+          "type": "string",
+          "description": "Human readable scheduled time string"
+        },
+        "scheduledTimestamp": {
+          "type": "number",
+          "description": "Epoch timestamp in milliseconds for countdown timer"
+        },
+        "isInstant": {
+          "type": "boolean",
+          "description": "Whether the battle starts immediately"
+        },
+        "hostUid": {
+          "type": "string",
+          "description": "Firebase UID of the host student"
+        },
+        "hostName": {
+          "type": "string",
+          "description": "Display name of the host"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["waiting", "live", "completed"],
+          "description": "Current lifecycle status of the room"
+        },
+        "questions": {
+          "type": "array",
+          "description": "List of generated MCQs for the room"
+        },
+        "participantsCount": {
+          "type": "number",
+          "description": "Count of joined students"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["roomId", "code", "title", "subject", "grade", "hostUid", "hostName", "status", "numQuestions", "timePerQuestion"]
+    },
+    "battleParticipant": {
+      "title": "Battle Participant",
+      "description": "A player joined into a battle room with status, score, and answer timestamps",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "User UID of participant"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of participant"
+        },
+        "isHost": {
+          "type": "boolean",
+          "description": "Whether this participant is the room host"
+        },
+        "isReady": {
+          "type": "boolean",
+          "description": "Whether the player is ready in the lobby"
+        },
+        "score": {
+          "type": "number",
+          "description": "Current points/score"
+        },
+        "correctCount": {
+          "type": "number",
+          "description": "Number of correctly answered questions"
+        },
+        "joinedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Join timestamp"
+        }
+      },
+      "required": ["uid", "name", "isReady", "score"]
     }
   },
   "firestore": {
@@ -216,6 +336,14 @@
     "/classSessions/{sessionId}/dialogueMessages/{messageId}": {
       "schema": "dialogueMessage",
       "description": "Subcollection holding full historical chat/vocal transcript dialogue histories"
+    },
+    "/battleRooms/{roomId}": {
+      "schema": "battleRoom",
+      "description": "Multiplayer battle quiz rooms accessible to participants via room code"
+    },
+    "/battleRooms/{roomId}/participants/{participantId}": {
+      "schema": "battleParticipant",
+      "description": "Players joined in the multiplayer battle room"
     }
   }
 }
